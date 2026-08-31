@@ -1,0 +1,25 @@
+# Environment / credentials
+.env
+.env.*
+*.session
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Node / frontend build
+node_modules/
+dist/
+circuito-web/static/
+
+# Archives / artifacts
+*.tar.gz
+*.tgz
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

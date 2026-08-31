@@ -1,0 +1,17 @@
+[Unit]
+Description=Circuito Aviso Web (FastAPI + Uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/circuito-web
+ExecStart=/opt/circuito-web/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8781
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/circuito-web.log
+StandardError=append:/var/log/circuito-web.log
+
+[Install]
+WantedBy=multi-user.target

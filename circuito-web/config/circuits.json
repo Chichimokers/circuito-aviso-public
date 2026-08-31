@@ -1,0 +1,13 @@
+{
+  "circuits": [
+    {
+      "code": "M2044",
+      "name": "M2044",
+      "location": "Repartos Dinorah, Jesus Nazareno, Medina. Av. Santiago de Las Vegas y calle 315 (Lutgardita)",
+      "lat": 22.9550,
+      "lng": -82.3847,
+      "visible": false,
+      "monitor": true
+    }
+  ]
+}
