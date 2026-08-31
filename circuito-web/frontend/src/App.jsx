@@ -177,6 +177,7 @@ function AlertOverlay({ notices, onOpen, onFly }) {
 
 export default function App() {
   const [markers, setMarkers] = useState([])
+  const [oficialState, setOficialState] = useState({})
   const [incoming, setIncoming] = useState({})
   const [notices, setNotices] = useState({})
   const [muted, setMuted] = useState(() => localStorage.getItem('cav_muted') === '1')
@@ -321,6 +322,17 @@ export default function App() {
 
   useEffect(() => { reloadMarkers() }, [reloadMarkers])
 
+  const reloadOficial = useCallback(async () => {
+    try {
+      const data = await apiGet('/circuits')
+      const map = {}
+      for (const c of data || []) map[String(c.code).toUpperCase()] = c.oficial_status || null
+      setOficialState(map)
+    } catch (e) { /* el color queda neutro si falla */ }
+  }, [])
+
+  useEffect(() => { reloadOficial() }, [reloadOficial])
+
   const loadHistorial = useCallback(async (circuit) => {
     setHistoryLoading(true)
     try {
@@ -391,6 +403,10 @@ export default function App() {
   const handleEvent = useCallback((ev) => {
     if (ev.type === 'online' || ev.type === 'hello') {
       setOnlineUsers(Number(ev.count) || 0)
+      return
+    }
+    if (ev.type === 'oficial') {
+      setOficialState((prev) => ({ ...prev, [String(ev.code).toUpperCase()]: ev.status || null }))
       return
     }
     if (ev.type === 'alert') {
@@ -695,10 +711,13 @@ export default function App() {
         />
 
         {filteredMarkers.map((m) => {
-          const hasAlert = incoming[m.circuit]
           const validated = (m.votes || 0) >= 10
-          const baseColor = validated ? '#34c759' : '#4aa3ff'
-          const color = hasAlert && hasAlert.status === 'AFECTADO' ? '#ff3b30' : baseColor
+          const oficialStatus = oficialState[m.circuit ? String(m.circuit).toUpperCase() : null]
+          let color
+          if (oficialStatus === 'RESTABLECIDO') color = '#34c759'
+          else if (oficialStatus === 'AFECTADO') color = '#ff3b30'
+          else if (!m.circuit) color = validated ? '#34c759' : '#4aa3ff'
+          else color = '#4aa3ff'
           return (
             <Marker
               key={m.id}
@@ -712,6 +731,11 @@ export default function App() {
               <Popup>
                 <div className="popup">
                   <strong>{m.circuit || 'Punto sin circuito'}</strong>
+                  {oficialStatus && (
+                    <div className={`popup-oficial ${oficialStatus === 'AFECTADO' ? 'red' : 'green'}`}>
+                      {oficialStatus === 'AFECTADO' ? 'Afectado' : 'Restablecido'} · según canal oficial
+                    </div>
+                  )}
                   {m.note && <div className="popup-note">{m.note}</div>}
                   <div className="vote-row">
                     <span className={`vote-badge ${validated ? 'good' : ''}`}>

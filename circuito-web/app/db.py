@@ -51,6 +51,16 @@ def init_db():
     if "votes" not in cols:
         cur.execute("ALTER TABLE markers ADD COLUMN votes INTEGER DEFAULT 0")
     conn.commit()
+
+    # migracion: estado oficial (de canales oficiales) en circuits
+    ccols = [r[1] for r in cur.execute("PRAGMA table_info(circuits)").fetchall()]
+    if "oficial_status" not in ccols:
+        cur.execute("ALTER TABLE circuits ADD COLUMN oficial_status TEXT DEFAULT NULL")
+    if "oficial_time" not in ccols:
+        cur.execute("ALTER TABLE circuits ADD COLUMN oficial_time TEXT DEFAULT NULL")
+    if "oficial_source" not in ccols:
+        cur.execute("ALTER TABLE circuits ADD COLUMN oficial_source TEXT DEFAULT NULL")
+    conn.commit()
     cur.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

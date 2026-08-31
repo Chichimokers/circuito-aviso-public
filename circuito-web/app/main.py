@@ -69,6 +69,12 @@ class AlertIn(BaseModel):
     text: Optional[str] = None
 
 
+class OficialIn(BaseModel):
+    code: str
+    status: str
+    source: Optional[str] = None
+
+
 def _broadcast(payload: dict):
     data = json.dumps(payload, ensure_ascii=False)
     for q in list(subscribers):
@@ -306,6 +312,43 @@ async def receive_alert(a: AlertIn):
     _broadcast(payload)
     log.info(f"Alerta recibida: {code} -> {a.status}")
     return {"ok": True}
+
+
+@app.post("/api/oficial")
+async def receive_oficial(o: OficialIn):
+    """El bot informa el estado OFICIAL (desde un canal oficial) de un circuito.
+
+    Este estado es el que pinta los puntos en el mapa (verde/rojo) y es persistente
+    en BD: el último post de cualquier canal oficial gana. No crea notificaciones
+    (el mismo post ya pasa por /api/alert para notificar); solo fija el color.
+    """
+    code = o.code.strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="code requerido")
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+
+    conn = db.get_conn()
+    prev = conn.execute(
+        "SELECT oficial_status FROM circuits WHERE code = ?", (code,)
+    ).fetchone()
+    prev_status = prev["oficial_status"] if prev else None
+    conn.execute(
+        "INSERT INTO circuits (code, name, location, visible, monitor, status, last_event, last_event_time, oficial_status, oficial_time, oficial_source) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(code) DO UPDATE SET "
+        "status=excluded.status, last_event=excluded.last_event, last_event_time=excluded.last_event_time, "
+        "oficial_status=excluded.oficial_status, oficial_time=excluded.oficial_time, oficial_source=excluded.oficial_source",
+        (code, code, "", 1, 1, o.status, code, now, o.status, now, o.source or ""),
+    )
+    conn.commit()
+    conn.close()
+
+    if prev_status != o.status:
+        payload = {"type": "oficial", "code": code, "status": o.status, "source": o.source or "", "time": now}
+        _broadcast(payload)
+        log.info(f"Estado oficial: {code} -> {o.status} (fuente: {o.source or '?'})")
+    return {"ok": True, "status": o.status}
 
 
 @app.get("/api/notifications")

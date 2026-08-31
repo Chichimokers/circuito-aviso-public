@@ -9,6 +9,7 @@ import urllib.request
 from datetime import datetime, timedelta
 from pyrogram import Client, filters
 from pyrogram.types import Message
+from pyrogram.handlers import MessageHandler
 from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
@@ -28,6 +29,11 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 WATCH_GROUPS = [int(x.strip()) for x in os.getenv("WATCH_GROUPS", "").split(",") if x.strip()]
 ALERT_GROUP = int(os.getenv("ALERT_GROUP", "0"))
 WATCH_MUNICIPALITIES = [x.strip() for x in os.getenv("WATCH_MUNICIPALITIES", "").split(",") if x.strip()]
+
+# Canales oficiales: sus posts generan notificaciones NORMALES y ADEMAS
+# fijan el color persistente (verde/rojo) de los puntos (post mas reciente gana).
+OFFICIAL_CHANNELS = [x.strip().lstrip("@") for x in os.getenv("OFFICIAL_CHANNELS", "").split(",") if x.strip()]
+official_chat_ids: set = set()
 
 STATS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stats.json")
 
@@ -284,28 +290,53 @@ async def _send_alert(msg, codes, muni_match=None):
         _http_json("/api/alert", method="POST",
                    payload={"code": clean_code, "status": status, "location": location, "text": txt}, timeout=6)
 
-async def _send_tags():
+async def _on_official_channel(client, msg):
+    """Post de un canal oficial. Solo se procesa si lo escribio el canal mismo.
+
+    - Genera la notificacion NORMAL (igual que los grupos): /api/alert -> toasts, badge, historial.
+    - Ademas fija el color persistente del punto: /api/oficial (post mas reciente gana).
+    """
+    txt = msg.text or msg.caption or ""
+    if not txt:
+        return
+    # Solo posts escritos por el propio canal (no comentarios/reenvios de usuarios).
+    # Un post llega como msg.chat == canal, o por un grupo vinculado donde
+    # msg.sender_chat es el canal. Comentarios de usuarios traen from_user.
+    sender_id = (msg.sender_chat.id if msg.sender_chat else None)
+    is_official_post = (
+        (msg.chat.id in official_chat_ids or sender_id in official_chat_ids)
+        and (msg.from_user is None or sender_id in official_chat_ids)
+    )
+    if not is_official_post:
+        return
+    matched = _find_matching_codes(txt)
+    muni_match = _check_municipality_match(txt)
+    status = _detect_status(txt)
+    if not matched and not muni_match:
+        return
+    log.info(f"[OFICIAL] {msg.chat.title or msg.chat.username}: {matched} muni={muni_match} -> {status}")
+    # Notificacion normal (+ /api/alert internamente)
+    await _send_alert(msg, matched, muni_match)
+    # Color persistente para cada circuito mencionado
+    source = msg.chat.title or msg.chat.username or ""
+    for code in matched:
+        clean = code.strip("[]")
+        _http_json("/api/oficial", method="POST",
+                   payload={"code": clean, "status": status, "source": source}, timeout=6)
+
+
+# Usuario que se taguea (en vez de taguear a todo el grupo)
+SPECIAL_TAG = os.getenv("SPECIAL_TAG", "@Ramsomware1575")
+# Circuitos que disparan el tagueo especial
+TAG_CIRCUITS = [x.strip().upper() for x in os.getenv("TAG_CIRCUITS", "M2044,D1190,A1496").split(",") if x.strip()]
+
+
+async def _send_tags(codes=None):
     try:
-        tags = []
-        async for member in bot.get_chat_members(ALERT_GROUP):
-            user = member.user
-            if user.is_self:
-                continue
-            if user.username:
-                tags.append(f"@{user.username}")
-            else:
-                tags.append(f"[{user.first_name or 'U'}](tg://user?id={user.id})")
-        if not tags:
+        codes = [str(c).strip().upper() for c in (codes or [])]
+        if not any(c in TAG_CIRCUITS for c in codes):
             return
-        line = ""
-        for tag in tags:
-            if len(line) + len(tag) + 1 > 3900:
-                await bot.send_message(ALERT_GROUP, line.strip())
-                line = tag + " "
-            else:
-                line += tag + " "
-        if line.strip():
-            await bot.send_message(ALERT_GROUP, line.strip())
+        await bot.send_message(ALERT_GROUP, SPECIAL_TAG)
     except Exception as e:
         log.warning(f"Error tags: {e}")
 
@@ -400,7 +431,7 @@ async def on_monitored_message(client, msg):
         return
     log.info(f"Detectado: {matched} muni={muni_match} -> {status} en {msg.chat.title}")
     asyncio.create_task(_send_alert(msg, matched, muni_match))
-    asyncio.create_task(_send_tags())
+    asyncio.create_task(_send_tags(matched))
 
 @bot.on_message(filters.chat(ALERT_GROUP) & filters.command(["statics"]))
 async def on_statics(client, msg):
@@ -417,6 +448,18 @@ async def on_start(client):
     log.info(f"Alertas a: {ALERT_GROUP}")
     fetch_monitored_codes()
     log.info(f"Municipios: {WATCH_MUNICIPALITIES}")
+    log.info(f"Canales oficiales: {OFFICIAL_CHANNELS}")
+    # Registrar un handler por cada canal oficial (resolver username -> id)
+    for uname in OFFICIAL_CHANNELS:
+        try:
+            chat = await app.get_chat(uname)
+            official_chat_ids.add(chat.id)
+            # Sin filters.channel: no depende del tipo de chat, y entra igual
+            # el post directo o el que llega por un grupo vinculado.
+            app.add_handler(MessageHandler(_on_official_channel, filters.chat([chat.id])))
+            log.info(f"Canal oficial registrado: {uname} -> {chat.id} ({chat.title})")
+        except Exception as e:
+            log.warning(f"No se pudo registrar canal oficial {uname}: {e}")
     asyncio.create_task(_hourly_summary())
     asyncio.create_task(_periodic_refresh())
 
