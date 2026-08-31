@@ -325,6 +325,13 @@ body {
 }
 .prov-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
 .intro-foot { color: var(--muted); font-size: 12px; text-align: center; }
+.setup-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+.setup-btn { text-align: center; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.setup-btn.yes { background: var(--green, #2ea36b); border-color: var(--green, #2ea36b); color: #fff; }
+.setup-btn.yes:hover { background: #39c07f; border-color: #39c07f; }
+.setup-btn.done { width: 100%; background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; }
+.setup-btn.done:hover { filter: brightness(1.1); }
+.setup-card { max-width: 480px; }
 
 /* Top bar actions */
 .top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }

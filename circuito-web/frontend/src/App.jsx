@@ -274,6 +274,8 @@ export default function App() {
   const [provincia, setProvincia] = useState(() => localStorage.getItem('cav_provincia') || '')
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem('cav_provincia'))
   const [welcomeSeen, setWelcomeSeen] = useState(false)
+  // Tutorial de notificaciones/sonido (obligatorio la primera vez, clave propia)
+  const [showSetup, setShowSetup] = useState(false)
 
   // Marcado de punto
   const [addingMode, setAddingMode] = useState(false)
@@ -663,6 +665,21 @@ export default function App() {
   const reopenOnboarding = () => {
     setShowIntro(true)
   }
+
+  // ---- Tutorial de notificaciones / sonido (primera configuracion) ----
+  const finishSetup = useCallback(() => {
+    localStorage.setItem('cav_setup_done', '1')
+    setShowSetup(false)
+  }, [])
+
+  useEffect(() => {
+    // Se muestra SIEMPRE que no este configurado (cav_setup_done), incluso si
+    // el usuario ya hizo el onboarding de provincia. Si el intro de provincia
+    // esta abierto, esperamos a que termine para no pisarlo.
+    if (localStorage.getItem('cav_setup_done')) return
+    if (showIntro) return
+    setShowSetup(true)
+  }, [showIntro])
 
   useEffect(() => {
     if (!toast) return
@@ -1375,9 +1392,65 @@ export default function App() {
               ))}
             </div>
             <div className="intro-foot">
-              ¿Quieres agregar tu punto? Hazlo desde el mapa con el botón
+              �Quieres agregar tu punto? Hazlo desde el mapa con el bot�n
               <strong> "Agregar mi punto"</strong>.
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Onboarding: notificaciones / sonido (obligatorio la 1a config) */}
+      {showSetup && (
+        <div className="intro">
+          <div className="intro-card setup-card">
+            <div className="intro-logo"><Bell size={28} /></div>
+            <h1>Configura tus notificaciones</h1>
+            <p className="intro-desc">
+              Por defecto <b>ningún circuito suena</b>. Tú decides de cuáles quieres recibir sonido
+              (y notificación, aunque cierres la web). Puedes elegir uno a uno desde el panel de
+              sonidos <Music size={12} />, o decidirlo aquí ahora.
+            </p>
+
+            <div className="intro-step">
+              <span className="step-num">1</span>
+              <span>¿Quieres que suenen tus circuitos/municipios ahora?</span>
+            </div>
+            <div className="setup-actions">
+              <button className="prov-btn setup-btn yes" onClick={() => { soundAll(); }}>
+                <Volume2 size={16} /> Sonar todos
+              </button>
+              <button className="prov-btn setup-btn" onClick={() => { soundNone(); }}>
+                <VolumeX size={16} /> Silenciar todos
+              </button>
+            </div>
+
+            {('serviceWorker' in navigator && 'PushManager' in window) && (
+              <div className="intro-step">
+                <span className="step-num">2</span>
+                <span>
+                  {pushApi.enabled
+                    ? <>Notificaciones <b>activadas</b> (sonarán aunque cierres la web).</>
+                    : <>Activa las notificaciones para recibirlas <b>aunque cierres la web</b>.</>}
+                </span>
+              </div>
+            )}
+            {('serviceWorker' in navigator && 'PushManager' in window) && (
+              <div className="setup-actions">
+                <button
+                  className="prov-btn setup-btn yes"
+                  onClick={() => pushApi.subscribe().then((id) => { if (id) setToast({ text: 'Notificaciones activadas' }); })}
+                >
+                  <Bell size={16} /> {pushApi.enabled ? 'Reactivar notificaciones' : 'Activar notificaciones'}
+                </button>
+              </div>
+            )}
+
+            <p className="intro-foot">
+              Siempre podrás cambiarlo desde el icono de sonido <Music size={12} />, circuito por circuito.
+            </p>
+            <button className="prov-btn setup-btn done" onClick={finishSetup}>
+              <Check size={16} /> ¡Entendido, listo!
+            </button>
           </div>
         </div>
       )}
