@@ -274,8 +274,9 @@ export default function App() {
   const [provincia, setProvincia] = useState(() => localStorage.getItem('cav_provincia') || '')
   const [showIntro, setShowIntro] = useState(() => !localStorage.getItem('cav_provincia'))
   const [welcomeSeen, setWelcomeSeen] = useState(false)
-  // Tutorial de notificaciones/sonido (obligatorio la primera vez, clave propia)
-  const [showSetup, setShowSetup] = useState(false)
+  // Tutorial de notificaciones/sonido (asistente por pasos, clave propia)
+  // 0=cerrado, 1=sonido, 2=notificaciones, 3=confirmacion
+  const [setupStep, setSetupStep] = useState(0)
 
   // Marcado de punto
   const [addingMode, setAddingMode] = useState(false)
@@ -669,17 +670,27 @@ export default function App() {
   // ---- Tutorial de notificaciones / sonido (primera configuracion) ----
   const finishSetup = useCallback(() => {
     localStorage.setItem('cav_setup_done', '1')
-    setShowSetup(false)
+    setSetupStep(0)
+    setSoundOpen(false)
+  }, [])
+
+  const nextSetupStep = useCallback(() => {
+    setSetupStep((s) => s + 1)
   }, [])
 
   useEffect(() => {
-    // Se muestra SIEMPRE que no este configurado (cav_setup_done), incluso si
-    // el usuario ya hizo el onboarding de provincia. Si el intro de provincia
-    // esta abierto, esperamos a que termine para no pisarlo.
+    // Se muestra SIEMPRE que no este configurado (cav_setup_done), aunque el
+    // usuario ya haya hecho el onboarding de provincia. Esperamos a que el intro
+    // de provincia termine para no pisarlo.
     if (localStorage.getItem('cav_setup_done')) return
     if (showIntro) return
-    setShowSetup(true)
+    setSetupStep(1)
   }, [showIntro])
+
+  // Al estar en el paso 1, abrir el panel real de sonidos para configurar de verdad
+  useEffect(() => {
+    if (setupStep === 1) setSoundOpen(true)
+  }, [setupStep])
 
   useEffect(() => {
     if (!toast) return
@@ -1399,59 +1410,65 @@ export default function App() {
         </div>
       )}
 
-      {/* Onboarding: notificaciones / sonido (obligatorio la 1a config) */}
-      {showSetup && (
-        <div className="intro">
-          <div className="intro-card setup-card">
-            <div className="intro-logo"><Bell size={28} /></div>
-            <h1>Configura tus notificaciones</h1>
-            <p className="intro-desc">
-              Por defecto <b>ningún circuito suena</b>. Tú decides de cuáles quieres recibir sonido
-              (y notificación, aunque cierres la web). Puedes elegir uno a uno desde el panel de
-              sonidos <Music size={12} />, o decidirlo aquí ahora.
-            </p>
-
-            <div className="intro-step">
-              <span className="step-num">1</span>
-              <span>¿Quieres que suenen tus circuitos/municipios ahora?</span>
-            </div>
-            <div className="setup-actions">
-              <button className="prov-btn setup-btn yes" onClick={() => { soundAll(); }}>
-                <Volume2 size={16} /> Sonar todos
-              </button>
-              <button className="prov-btn setup-btn" onClick={() => { soundNone(); }}>
-                <VolumeX size={16} /> Silenciar todos
-              </button>
-            </div>
-
-            {('serviceWorker' in navigator && 'PushManager' in window) && (
-              <div className="intro-step">
-                <span className="step-num">2</span>
-                <span>
-                  {pushApi.enabled
-                    ? <>Notificaciones <b>activadas</b> (sonarán aunque cierres la web).</>
-                    : <>Activa las notificaciones para recibirlas <b>aunque cierres la web</b>.</>}
-                </span>
-              </div>
-            )}
-            {('serviceWorker' in navigator && 'PushManager' in window) && (
-              <div className="setup-actions">
-                <button
-                  className="prov-btn setup-btn yes"
-                  onClick={() => pushApi.subscribe().then((id) => { if (id) setToast({ text: 'Notificaciones activadas' }); })}
-                >
-                  <Bell size={16} /> {pushApi.enabled ? 'Reactivar notificaciones' : 'Activar notificaciones'}
-                </button>
-              </div>
-            )}
-
-            <p className="intro-foot">
-              Siempre podrás cambiarlo desde el icono de sonido <Music size={12} />, circuito por circuito.
-            </p>
-            <button className="prov-btn setup-btn done" onClick={finishSetup}>
-              <Check size={16} /> ¡Entendido, listo!
-            </button>
+      {/* Onboarding: asistente de notificaciones / sonido (banner flotante, abre paneles reales) */}
+      {setupStep === 1 && (
+        <div className="setup-banner">
+          <div className="setup-banner-head">
+            <span className="setup-banner-step">Paso 1 de 3</span>
+            <b><Volume2 size={15} /> ¿Qué circuitos suenan?</b>
           </div>
+          <p className="setup-banner-text">
+            En el panel de arriba <b>eliges de verdad</b> qué circuitos suenan. Toca
+            <b> "Sonar todos"</b> o <b>"Silenciar todos"</b>, o elige circuito por circuito. Cuando
+            termines, avanza.
+          </p>
+          <div className="setup-actions">
+            <button className="prov-btn setup-btn yes" onClick={soundAll}><Volume2 size={16} /> Sonar todos</button>
+            <button className="prov-btn setup-btn" onClick={soundNone}><VolumeX size={16} /> Silenciar todos</button>
+          </div>
+          <button className="prov-btn setup-btn done" onClick={nextSetupStep}>Siguiente →</button>
+        </div>
+      )}
+
+      {setupStep === 2 && (
+        <div className="setup-banner">
+          <div className="setup-banner-head">
+            <span className="setup-banner-step">Paso 2 de 3</span>
+            <b><Bell size={15} /> Activa las notificaciones</b>
+          </div>
+          <p className="setup-banner-text">
+            Así recibirás el aviso <b>aunque cierres la web</b> (en tu móvil). Pulga el botón y
+            acepta el permiso del navegador.
+          </p>
+          {('serviceWorker' in navigator && 'PushManager' in window) ? (
+            <div className="setup-actions">
+              <button
+                className="prov-btn setup-btn yes"
+                onClick={() => pushApi.subscribe().then((id) => { if (id) setToast({ text: 'Notificaciones activadas' }); })}
+              >
+                <Bell size={16} /> {pushApi.enabled ? 'Reactivar notificaciones' : 'Activar notificaciones'}
+              </button>
+            </div>
+          ) : (
+            <p className="setup-banner-text">Tu navegador no soporta notificaciones; puedes continuar igual.</p>
+          )}
+          {pushApi.enabled && <p className="setup-banner-ok"><Check size={14} /> Notificaciones activadas</p>}
+          <button className="prov-btn setup-btn done" onClick={nextSetupStep}>Siguiente →</button>
+        </div>
+      )}
+
+      {setupStep === 3 && (
+        <div className="setup-banner">
+          <div className="setup-banner-head">
+            <span className="setup-banner-step">Paso 3 de 3</span>
+            <b><Check size={15} /> ¡Todo listo!</b>
+          </div>
+          <p className="setup-banner-text">
+            Configuración guardada. Siempre podrás cambiarla desde el icono de sonido, circuito por circuito.
+          </p>
+          <button className="prov-btn setup-btn done" onClick={finishSetup}>
+            <Check size={16} /> ¡Comenzar!
+          </button>
         </div>
       )}
     </div>
