@@ -1,0 +1,23 @@
+{
+  "name": "Circuito Aviso",
+  "short_name": "CircuitoAviso",
+  "description": "Ubica tu circuito eléctrico y recibe avisos en tiempo real de afectaciones y restablecimientos de la luz.",
+  "start_url": "/circuitos/",
+  "scope": "/circuitos/",
+  "display": "standalone",
+  "background_color": "#0d1220",
+  "theme_color": "#0d1220",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/circuitos/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/circuitos/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

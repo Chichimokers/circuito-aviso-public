@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import db, config
+from . import push as pushmod
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -73,6 +74,20 @@ class OficialIn(BaseModel):
     code: str
     status: str
     source: Optional[str] = None
+
+
+class PushSubscribeIn(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+    user_agent: Optional[str] = None
+
+
+class PushPrefIn(BaseModel):
+    sub_id: int
+    circuit: str
+    mode: str
+    tone: Optional[str] = None
 
 
 def _broadcast(payload: dict):
@@ -311,7 +326,27 @@ async def receive_alert(a: AlertIn):
     payload = {"type": "alert", "code": code, "status": a.status, "text": text, "time": now, "lat": lat, "lng": lng, "points": points}
     _broadcast(payload)
     log.info(f"Alerta recibida: {code} -> {a.status}")
+
+    # Web Push (fondo / app cerrada): solo a suscripciones que "sueñan" este circuito
+    try:
+        _push_for_circuit(code, a.status, text)
+    except Exception as e:
+        log.warning(f"Push fail: {e}")
+
     return {"ok": True}
+
+
+def _push_for_circuit(code, status, text):
+    title = f"{code}"
+    if status == "AFECTADO":
+        title = f"🔴 Afectado: {code}"
+    elif status == "RESTABLECIDO":
+        title = f"🟢 Restablecido: {code}"
+    else:
+        title = f"ℹ️ Informado: {code}"
+    body = (text or code)[:160]
+    for sub in pushmod.subscriptions_that_sound_for(code):
+        pushmod.send_push_sync(sub, title, body, tag=f"circ-{code}", data={"code": code, "status": status, "time": db._utcnow_iso()})
 
 
 @app.post("/api/oficial")
@@ -394,6 +429,36 @@ def _online_count() -> int:
 
 def _broadcast_online():
     _broadcast({"type": "online", "count": _online_count()})
+
+
+@app.get("/api/push/vapid-public-key")
+def push_vapid_public():
+    return {"key": pushmod.VAPID_PUBLIC_KEY}
+
+
+@app.post("/api/push/subscribe")
+def push_subscribe(p: PushSubscribeIn):
+    sub_id = pushmod.upsert_subscription(p.endpoint, p.p256dh, p.auth, p.user_agent)
+    if sub_id is None:
+        raise HTTPException(status_code=500, detail="no se pudo guardar")
+    return {"ok": True, "sub_id": sub_id}
+
+
+@app.post("/api/push/unsubscribe")
+def push_unsubscribe(p: PushSubscribeIn):
+    pushmod.delete_subscription(p.endpoint)
+    return {"ok": True}
+
+
+@app.post("/api/push/prefs")
+def push_set_pref(p: PushPrefIn):
+    pushmod.set_prefs(p.sub_id, p.circuit, p.mode, p.tone)
+    return {"ok": True}
+
+
+@app.get("/api/push/prefs")
+def push_get_prefs(sub_id: int):
+    return {"prefs": pushmod.get_prefs(sub_id)}
 
 
 @app.get("/api/events/stream")

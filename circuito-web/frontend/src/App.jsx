@@ -6,8 +6,9 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { apiGet, apiPost, apiDeleteAdmin, apiVerifyAdmin, apiVote, apiNotifications } from './api.js'
 import { useRealtime } from './hooks/useRealtime.js'
+import { usePush } from './hooks/usePush.js'
 import {
-  playNotifySoundForCircuit, getCircuitSound, setCircuitSound,
+  playNotifySoundForCircuit, getCircuitSound, setCircuitSound, loadCircuitSounds,
   saveCustomAudio, clearCustomAudio,
   PREDEFINED_TONES, statusMeta
 } from './notifications.js'
@@ -238,11 +239,13 @@ export default function App() {
   }, [muted])
   const mutedRef = useRef(muted)
   mutedRef.current = muted
+  const pushApi = usePush()
   const updateCircuitSound = useCallback((circuit, cfg) => {
     if (!circuit) return
     setCircuitSound(circuit, cfg)
+    pushApi.setServerPref(circuit, cfg)
     setSoundsVersion((v) => v + 1)
-  }, [])
+  }, [pushApi])
   const handleCustomUpload = useCallback(async (circuit, file) => {
     if (!circuit || !file) return
     try {
@@ -478,6 +481,28 @@ export default function App() {
     return m
   }, [markersWithCode])
 
+  // Sonar todos / silenciar todos (por defecto todo está silenciado)
+  const soundAll = useCallback(() => {
+    for (const code of Object.keys(byCode)) {
+      setCircuitSound(code, { mode: 'default' })
+      pushApi.setServerPref(code, { mode: 'default' })
+    }
+    setSoundsVersion((v) => v + 1)
+  }, [byCode, pushApi])
+  const soundNone = useCallback(() => {
+    for (const code of Object.keys(byCode)) {
+      setCircuitSound(code, { mode: 'none' })
+      pushApi.setServerPref(code, { mode: 'none' })
+    }
+    setSoundsVersion((v) => v + 1)
+  }, [byCode, pushApi])
+
+  // Sincronizar preferencias de sonido locales con el servidor al montar
+  useEffect(() => {
+    if (pushApi.subId) pushApi.syncPrefs(loadCircuitSounds())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const munCodes = useMemo(() => {
     const seen = {}
     for (const h of munList) { if (h.circuit) seen[h.circuit] = true }
@@ -671,6 +696,13 @@ export default function App() {
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
           <button className="admin-toggle" title="Configurar sonidos por circuito" onClick={() => setSoundOpen((v) => !v)}><Music size={18} /></button>
+          <button
+            className="admin-toggle"
+            title={pushApi.enabled ? 'Desactivar notificaciones push' : 'Activar notificaciones push (fuera de la web)'}
+            onClick={() => { if (pushApi.enabled) pushApi.unsubscribe(); else pushApi.subscribe().then((id) => { if (id) setToast({ text: 'Notificaciones activadas. Las elegidas sonarán aunque cierres la web.' }); }) }}
+          >
+            {pushApi.enabled ? <Bell size={18} /> : <Bell size={18} style={{ opacity: 0.45 }} />}
+          </button>
           <button className="admin-toggle" onClick={() => setAdminOpen((v) => !v)}><KeyRound size={18} /></button>
           <div className="status-pill" title="Personas viendo Circuito Aviso ahora">
             <Users size={14} />
@@ -759,7 +791,7 @@ export default function App() {
                         value={(getCircuitSound(m.circuit).mode) || 'default'}
                         onChange={(e) => {
                           const mode = e.target.value
-                          if (mode === 'default') updateCircuitSound(m.circuit, null)
+                          if (mode === 'default') updateCircuitSound(m.circuit, { mode: 'default' })
                           else if (mode === 'none') updateCircuitSound(m.circuit, { mode: 'none' })
                           else if (mode === 'predefined') updateCircuitSound(m.circuit, { mode: 'predefined', tone: PREDEFINED_TONES[0] })
                           else if (mode === 'custom') updateCircuitSound(m.circuit, { mode: 'custom' })
@@ -1064,9 +1096,14 @@ export default function App() {
             <button className="close" onClick={() => setSoundOpen(false)}>×</button>
           </div>
           <p className="sound-hint">
-            Elige un sonido para cada circuito. "Silenciado" = no suena; "Predeterminado" = tono según el estado;
+            Por defecto todos los circuitos están <b>silenciados</b>. Elige cuáles quieres que suenen
+            (o súbelos todos abajo). "Silenciado" = no suena; "Predeterminado" = tono según el estado;
             o sube tu propio audio. {" "}<button className="link-btn" onClick={toggleMute}>{muted ? <><VolumeX size={14} /> Activar sonido (global)</> : <><Volume2 size={14} /> Silenciar todo (global)</>}</button>
           </p>
+          <div className="sound-bulk">
+            <button className="sound-bulk-btn" onClick={soundAll}><Volume2 size={14} /> Sonar todos</button>
+            <button className="sound-bulk-btn" onClick={soundNone}><VolumeX size={14} /> Silenciar todos</button>
+          </div>
           <div className="sound-list">
             {Object.keys(byCode).length === 0 && (
               <div className="empty">No hay circuitos aún. Agrega tu punto primero.</div>
@@ -1081,7 +1118,7 @@ export default function App() {
                     value={cfg.mode || 'default'}
                     onChange={(e) => {
                       const mode = e.target.value
-                      if (mode === 'default') updateCircuitSound(code, null)
+                          if (mode === 'default') updateCircuitSound(code, { mode: 'default' })
                       else if (mode === 'none') updateCircuitSound(code, { mode: 'none' })
                       else if (mode === 'predefined') updateCircuitSound(code, { mode: 'predefined', tone: PREDEFINED_TONES[0] })
                       else if (mode === 'custom') updateCircuitSound(code, { mode: 'custom' })
@@ -1142,7 +1179,7 @@ export default function App() {
                         value={cfg.mode || 'default'}
                         onChange={(e) => {
                           const mode = e.target.value
-                          if (mode === 'default') updateCircuitSound(code, null)
+                      if (mode === 'default') updateCircuitSound(code, { mode: 'default' })
                           else if (mode === 'none') updateCircuitSound(code, { mode: 'none' })
                           else if (mode === 'predefined') updateCircuitSound(code, { mode: 'predefined', tone: PREDEFINED_TONES[0] })
                           else if (mode === 'custom') updateCircuitSound(code, { mode: 'custom' })

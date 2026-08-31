@@ -315,8 +315,14 @@ async def _on_official_channel(client, msg):
     if not matched and not muni_match:
         return
     log.info(f"[OFICIAL] {msg.chat.title or msg.chat.username}: {matched} muni={muni_match} -> {status}")
-    # Notificacion normal (+ /api/alert internamente)
-    await _send_alert(msg, matched, muni_match)
+    # Notificacion normal (+ /api/alert internamente), con dedup: si la misma
+    # info ya se notifico en la ventana, no la repetimos (mismo post por varias
+    # vias no debe notificarse dos veces). El color /api/oficial igual se aplica.
+    is_dup = _is_duplicate(matched, muni_match, status, txt)
+    if is_dup:
+        log.info(f"[OFICIAL] Duplicado ignorado en notificacion: {matched} -> {status}")
+    else:
+        await _send_alert(msg, matched, muni_match)
     # Color persistente para cada circuito mencionado
     source = msg.chat.title or msg.chat.username or ""
     for code in matched:

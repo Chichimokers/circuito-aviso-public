@@ -73,8 +73,10 @@ function playDefault(status) {
 
 // ---- Configuración persistida por circuito (localStorage, solo meta pequeña) ----
 // cfg: { mode: 'default'|'none'|'predefined'|'custom', tone?, name? }
+// Por defecto TODO silenciado: si un circuito no tiene config, NO suena.
+// El usuario debe elegir que suene (o pulsar "Activar todas").
 const KEY = 'cav_sounds'
-export const DEFAULT_CIRCUIT_SOUND = { mode: 'default' }
+export const DEFAULT_CIRCUIT_SOUND = { mode: 'none' }
 
 export function loadCircuitSounds() {
   try {
@@ -100,7 +102,8 @@ function persistSounds(all) {
 
 export function setCircuitSound(circuit, cfg) {
   const all = loadCircuitSounds()
-  if (!cfg || !cfg.mode || cfg.mode === 'default') {
+  if (!cfg || !cfg.mode || cfg.mode === 'none') {
+    // sin config o 'none' -> quitar (equivale a silenciado)
     delete all[circuit]
   } else {
     all[circuit] = cfg
@@ -184,13 +187,12 @@ async function playCustom(circuit) {
 }
 
 // Reproduce el sonido de un circuito según su config.
-// - 'none'      : silenciado
+// - sin config o 'none' : silenciado (por defecto)
 // - 'predefined': tono predefinido (tone)
 // - 'custom'    : audio subido por el usuario (desde IndexedDB)
 // - 'default'   : sonido por defecto según el estado
 export function playNotifySoundForCircuit(circuit, cfg, status) {
-  if (!cfg || !cfg.mode) { playDefault(status); return }
-  if (cfg.mode === 'none') return
+  if (!cfg || !cfg.mode || cfg.mode === 'none') return
   if (cfg.mode === 'predefined' && cfg.tone) { playTone(cfg.tone); return }
   if (cfg.mode === 'custom') { playCustom(circuit); return }
   playDefault(status)

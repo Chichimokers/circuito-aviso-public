@@ -564,6 +564,9 @@ body {
 .sound-head { display: flex; align-items: center; justify-content: space-between; }
 .sound-head h3 { font-size: 15px; }
 .sound-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 8px 0 12px; }
+.sound-bulk { display: flex; gap: 8px; margin-bottom: 12px; }
+.sound-bulk-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); cursor: pointer; }
+.sound-bulk-btn:hover { border-color: var(--blue); color: var(--blue); }
 .sound-list { list-style: none; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
 .sound-row {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

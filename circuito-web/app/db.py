@@ -84,6 +84,28 @@ def init_db():
     cur.execute("CREATE INDEX IF NOT EXISTS idx_notif_circuit ON notifications(circuit, created_at DESC)")
     conn.commit()
 
+    # Suscripciones Web Push + preferencias de sonido por circuito (por suscripcion)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            endpoint TEXT UNIQUE NOT NULL,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            user_agent TEXT,
+            created_at TEXT
+        )
+    """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS circuit_prefs (
+            sub_id INTEGER NOT NULL REFERENCES push_subscriptions(id) ON DELETE CASCADE,
+            circuit TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            tone TEXT,
+            PRIMARY KEY (sub_id, circuit)
+        )
+    """)
+    conn.commit()
+
     # Seed: circuitos de config como circuitos "invisibles" de monitoreo base
     for c in config.load_seed_circuits():
         cur.execute("""
