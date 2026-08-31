@@ -418,6 +418,13 @@ def _build_statics():
 
 @app.on_message(filters.chat(WATCH_GROUPS))
 async def on_monitored_message(client, msg):
+    # Los posts de canales oficiales (aunque entren por un grupo vinculado en
+    # WATCH_GROUPS) los maneja _on_official_channel: aqui solo se ignoran para
+    # no notificar dos veces. El color solo lo cambia el canal oficial.
+    if official_chat_ids:
+        _s_id = (msg.sender_chat.id if msg.sender_chat else None)
+        if msg.chat.id in official_chat_ids or _s_id in official_chat_ids:
+            return
     txt = msg.text or msg.caption or ""
     if not txt:
         return
@@ -449,17 +456,22 @@ async def on_start(client):
     fetch_monitored_codes()
     log.info(f"Municipios: {WATCH_MUNICIPALITIES}")
     log.info(f"Canales oficiales: {OFFICIAL_CHANNELS}")
-    # Registrar un handler por cada canal oficial (resolver username -> id)
+    # Resolver username -> id de cada canal oficial (post mas reciente gana)
     for uname in OFFICIAL_CHANNELS:
         try:
             chat = await app.get_chat(uname)
             official_chat_ids.add(chat.id)
-            # Sin filters.channel: no depende del tipo de chat, y entra igual
-            # el post directo o el que llega por un grupo vinculado.
-            app.add_handler(MessageHandler(_on_official_channel, filters.chat([chat.id])))
             log.info(f"Canal oficial registrado: {uname} -> {chat.id} ({chat.title})")
         except Exception as e:
             log.warning(f"No se pudo registrar canal oficial {uname}: {e}")
+    # El handler oficial vigila los canales oficiales y los chats de WATCH_GROUPS:
+    # los posts del canal pueden entrar directo, o replicados en un grupo de
+    # discusion vinculado (que suele estar en WATCH_GROUPS). La validacion
+    # interna distingue si el post es del canal oficial (sender_chat/chat id).
+    if official_chat_ids:
+        official_scope = list(set(WATCH_GROUPS + list(official_chat_ids)))
+        app.add_handler(MessageHandler(_on_official_channel, filters.chat(official_scope)))
+        log.info(f"Handler oficial vigila: {official_scope}")
     asyncio.create_task(_hourly_summary())
     asyncio.create_task(_periodic_refresh())
 
