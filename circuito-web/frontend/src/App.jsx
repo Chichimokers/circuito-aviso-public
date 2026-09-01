@@ -792,9 +792,14 @@ export default function App() {
               <Popup>
                 <div className="popup">
                   <strong>{m.circuit || 'Punto sin circuito'}</strong>
-                  {oficialStatus && (
-                    <div className={`popup-oficial ${oficialStatus === 'AFECTADO' ? 'red' : 'green'}`}>
-                      {oficialStatus === 'AFECTADO' ? 'Afectado' : 'Restablecido'} · según canal oficial
+                  {oficialStatus === 'AFECTADO' && (
+                    <div className="popup-oficial red">
+                      Afectado · según canal oficial
+                    </div>
+                  )}
+                  {oficialStatus === 'RESTABLECIDO' && (
+                    <div className="popup-oficial green">
+                      Restablecido · según canal oficial
                     </div>
                   )}
                   {m.note && <div className="popup-note">{m.note}</div>}
