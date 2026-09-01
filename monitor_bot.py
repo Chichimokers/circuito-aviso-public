@@ -130,6 +130,7 @@ AFFECT_KEYWORDS = [
 RESTORE_KEYWORDS = [
     "restablecido", "queda restablecido", "queda el servicio",
     "restablecer", "se restablece", "ya hay luz",
+    "restablecimiento", "restableciend",
 ]
 
 app = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH,
