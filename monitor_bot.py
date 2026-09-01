@@ -264,7 +264,7 @@ def _build_alert_text(codes, status, municipality, sender_name, chat_title, msg_
     ])
     return "\n".join(lines)
 
-async def _send_alert(msg, codes, muni_match=None):
+async def _send_alert(msg, codes, muni_match=None, source=None):
     txt = msg.text or msg.caption or ""
     status = _detect_status(txt)
     municipality = _extract_municipality(txt, muni_match)
@@ -288,7 +288,7 @@ async def _send_alert(msg, codes, muni_match=None):
         clean_code = code.strip("[]")
         location = _circuit_location(clean_code)
         _http_json("/api/alert", method="POST",
-                   payload={"code": clean_code, "status": status, "location": location, "text": txt}, timeout=6)
+                   payload={"code": clean_code, "status": status, "location": location, "text": txt, "source": source}, timeout=6)
 
 async def _on_official_channel(client, msg):
     """Post de un canal oficial. Solo se procesa si lo escribio el canal mismo.
@@ -322,7 +322,7 @@ async def _on_official_channel(client, msg):
     if is_dup:
         log.info(f"[OFICIAL] Duplicado ignorado en notificacion: {matched} -> {status}")
     else:
-        await _send_alert(msg, matched, muni_match)
+        await _send_alert(msg, matched, muni_match, source="oficial")
     # Color persistente para cada circuito mencionado
     source = msg.chat.title or msg.chat.username or ""
     for code in matched:

@@ -42,6 +42,49 @@ body {
   z-index: 500;
 }
 
+@media (max-width: 599px) {
+  .topbar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+  .topbar .brand {
+    min-width: 0;
+  }
+  .topbar .brand-title {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar .brand-sub {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+  }
+  .topbar .hamburger {
+    flex-shrink: 0;
+    padding: 6px 10px;
+  }
+  .topbar .top-actions {
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .topbar .top-actions .admin-toggle {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  .topbar .top-actions .addpoint {
+    font-size: 12px;
+    padding: 8px 10px;
+    flex-shrink: 0;
+  }
+}
 .hamburger {
   background: var(--panel2);
   border: 1px solid var(--border);
@@ -55,6 +98,15 @@ body {
 .brand { display: flex; flex-direction: column; }
 .brand-title { font-weight: 700; font-size: 16px; }
 .brand-sub { font-size: 12px; color: var(--muted); }
+
+.oficial-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  color: #fff; background: var(--blue);
+  border-radius: 999px; padding: 2px 8px; margin: 2px 0;
+  width: fit-content;
+}
+
 
 .status-pill {
   margin-left: auto;

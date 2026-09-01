@@ -82,6 +82,10 @@ def init_db():
         )
     """)
     cur.execute("CREATE INDEX IF NOT EXISTS idx_notif_circuit ON notifications(circuit, created_at DESC)")
+    # migracion: origen de la notificacion ('oficial' cuando viene de un canal oficial)
+    ncols = [r[1] for r in cur.execute("PRAGMA table_info(notifications)").fetchall()]
+    if "source" not in ncols:
+        cur.execute("ALTER TABLE notifications ADD COLUMN source TEXT DEFAULT NULL")
     conn.commit()
 
     # Suscripciones Web Push + preferencias de sonido por circuito (por suscripcion)

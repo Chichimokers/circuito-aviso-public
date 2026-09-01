@@ -95,6 +95,7 @@ function FloatNotif({ point, notice, onOpen }) {
       <StatusDot status={notice.status} />
       <div className="notif-body">
         <strong>{notice.circuit}</strong>
+        {notice.source === 'oficial' && <span className="oficial-badge">Canal oficial</span>}
         <div className="notif-text">{notice.text}</div>
       </div>
     </div>
@@ -424,7 +425,7 @@ export default function App() {
       const points = (ev.points && ev.points.length)
         ? ev.points
         : (ev.lat != null ? [{ lat: ev.lat, lng: ev.lng }] : [])
-      setNotices((prev) => ({ ...prev, [nkey]: { key: nkey, circuit: ev.code, status: ev.status, text: ev.text || ev.code, time: ev.time, points } }))
+      setNotices((prev) => ({ ...prev, [nkey]: { key: nkey, circuit: ev.code, status: ev.status, text: ev.text || ev.code, time: ev.time, points, source: ev.source } }))
       setTimeout(() => {
         setNotices((prev) => { const n = { ...prev }; delete n[nkey]; return n })
       }, 9000)
@@ -432,7 +433,7 @@ export default function App() {
       // Aviso de municipio (sin punto): refrescar el panel y mostrar toast flotante
       if (!points.length && ev.lat == null) {
         const mkey = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
-        setMuniToasts((prev) => [...prev.slice(-3), { key: mkey, circuit: ev.code, status: ev.status, text: ev.text || ev.code }])
+        setMuniToasts((prev) => [...prev.slice(-3), { key: mkey, circuit: ev.code, status: ev.status, text: ev.text || ev.code, source: ev.source }])
         setTimeout(() => {
           setMuniToasts((prev) => prev.filter((t) => t.key !== mkey))
         }, 9000)
@@ -1057,6 +1058,7 @@ export default function App() {
                 <div>
                   <h3>{detailAlert.circuit}</h3>
                   <div className={`alert-detail-status ${meta.tone}`}>{detailAlert.status}</div>
+                  {detailAlert.source === 'oficial' && <span className="oficial-badge">Canal oficial</span>}
                 </div>
               </div>
               <div className="alert-detail-text">
@@ -1106,6 +1108,7 @@ export default function App() {
                           )
                         )}
                       </div>
+                      {h.source === 'oficial' && <span className="oficial-badge">Canal oficial</span>}
                       <div className="hist-time">{new Date(h.created_at).toLocaleString()}</div>
                     </div>
                   </li>

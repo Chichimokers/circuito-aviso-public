@@ -68,6 +68,7 @@ class AlertIn(BaseModel):
     status: str
     location: Optional[str] = None
     text: Optional[str] = None
+    source: Optional[str] = None
 
 
 class OficialIn(BaseModel):
@@ -301,8 +302,8 @@ async def receive_alert(a: AlertIn):
 
     text = a.text or code
     conn.execute(
-        "INSERT INTO notifications (circuit, status, text, lat, lng, created_at) VALUES (?,?,?,?,?,?)",
-        (code, a.status, text, lat, lng, now),
+        "INSERT INTO notifications (circuit, status, text, lat, lng, created_at, source) VALUES (?,?,?,?,?,?,?)",
+        (code, a.status, text, lat, lng, now, a.source),
     )
 
     # Prune: conservar max ~200 notificaciones de ESTE circuito (sin borrar otros)
@@ -323,7 +324,7 @@ async def receive_alert(a: AlertIn):
     conn.commit()
     conn.close()
 
-    payload = {"type": "alert", "code": code, "status": a.status, "text": text, "time": now, "lat": lat, "lng": lng, "points": points}
+    payload = {"type": "alert", "code": code, "status": a.status, "text": text, "time": now, "lat": lat, "lng": lng, "points": points, "source": a.source}
     _broadcast(payload)
     log.info(f"Alerta recibida: {code} -> {a.status}")
 
