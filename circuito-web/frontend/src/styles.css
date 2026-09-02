@@ -46,6 +46,7 @@ body {
   .topbar {
     gap: 8px;
     padding: 0 8px;
+    overflow: hidden;
   }
   .topbar .brand {
     min-width: 0;
@@ -80,8 +81,13 @@ body {
     flex-shrink: 0;
   }
   .topbar .top-actions .addpoint {
-    font-size: 12px;
-    padding: 8px 10px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
   }
 }
@@ -481,14 +487,14 @@ body {
   .topbar { padding: 0 10px; gap: 8px; }
   .brand-title { font-size: 15px; }
   .brand-sub { display: none; }
-  .status-pill {
-    padding: 4px 10px; gap: 6px; height: auto;
-    font-size: 12px; justify-content: center;
-  }
+  .status-pill { display: none; }
   .online-label { display: none; }
   .avatar-stack { display: none; }
   .online-count { display: inline; font-size: 13px; }
-  .addpoint { padding: 8px 10px; font-size: 13px; }
+  .addpoint {
+    width: 34px; height: 34px; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
   .admin-toggle { width: 34px; height: 34px; }
 
   .drawer { width: 100%; max-width: 360px; }
@@ -537,9 +543,14 @@ body {
 
 @media (max-width: 380px) {
   .prov-grid { grid-template-columns: 1fr; }
-  .top-actions { gap: 6px; }
-  .addpoint { font-size: 12px; padding: 8px 8px; }
+  .top-actions { gap: 4px; }
+  .topbar .top-actions .admin-toggle { width: 32px; height: 32px; }
+  .topbar .top-actions .addpoint { width: 32px; height: 32px; }
   .brand-title { font-size: 13px; }
+  .topbar .top-actions .addpoint {
+    font-size: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
 }
 
 /* safe-area para iPhones con notch */
