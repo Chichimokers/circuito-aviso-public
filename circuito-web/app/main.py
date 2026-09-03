@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from . import db, config
 from . import push as pushmod
+from . import stats as statsmod
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -306,10 +307,11 @@ async def receive_alert(a: AlertIn):
         (code, a.status, text, lat, lng, now, a.source),
     )
 
-    # Prune: conservar max ~200 notificaciones de ESTE circuito (sin borrar otros)
+    # Prune: conservar hasta 10000 notificaciones de ESTE circuito (sin borrar otros).
+    # Volumen alto para alimentar estadisticas a largo plazo.
     conn.execute(
         "DELETE FROM notifications WHERE circuit = ? AND id NOT IN "
-        "(SELECT id FROM notifications WHERE circuit = ? ORDER BY created_at DESC LIMIT 200)",
+        "(SELECT id FROM notifications WHERE circuit = ? ORDER BY created_at DESC LIMIT 10000)",
         (code, code),
     )
 
@@ -388,40 +390,65 @@ async def receive_oficial(o: OficialIn):
 
 
 @app.get("/api/notifications")
-def get_notifications(circuit: Optional[str] = None, limit: int = 50, kind: Optional[str] = None):
+def get_notifications(circuit: Optional[str] = None, limit: int = 50, kind: Optional[str] = None, source: Optional[str] = None):
     """Historial de notificaciones.
     - circuit: historial de un circuito concreto.
-    - kind='municipio': solo avisos sin punto de usuario (pseudo-códigos [Municipio]).
-    - kind='point': solo avisos que sí corresponden a un punto de usuario.
-    - sin circuit y sin kind: últimas globales.
+    - kind='municipio': solo avisos sin punto de usuario.
+    - kind='point': solo avisos con punto de usuario.
+    - source='oficial': solo mensajes del canal oficial.
     """
     conn = db.get_conn()
     if circuit:
-        rows = conn.execute(
-            "SELECT * FROM notifications WHERE circuit = ? ORDER BY created_at DESC LIMIT ?",
-            (circuit, limit),
-        ).fetchall()
+        sql = "SELECT * FROM notifications WHERE circuit = ?"
+        params = [circuit]
+        if source:
+            sql += " AND source = ?"
+            params.append(source)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
     elif kind == "municipio":
-        rows = conn.execute(
-            "SELECT * FROM notifications n WHERE NOT EXISTS ("
-            "SELECT 1 FROM markers m WHERE m.circuit IS NOT NULL AND m.circuit != '' AND UPPER(m.circuit) = UPPER(n.circuit)"
-            ") ORDER BY n.created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        sql = ("SELECT * FROM notifications n WHERE NOT EXISTS ("
+               "SELECT 1 FROM markers m WHERE m.circuit IS NOT NULL AND m.circuit != '' AND UPPER(m.circuit) = UPPER(n.circuit)")
+        params = []
+        if source:
+            sql += " AND n.source = ?"
+            params.append(source)
+        sql += ") ORDER BY n.created_at DESC LIMIT ?"
+        params.append(limit)
     elif kind == "point":
-        rows = conn.execute(
-            "SELECT * FROM notifications n WHERE EXISTS ("
-            "SELECT 1 FROM markers m WHERE m.circuit IS NOT NULL AND m.circuit != '' AND UPPER(m.circuit) = UPPER(n.circuit)"
-            ") ORDER BY n.created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        sql = ("SELECT * FROM notifications n WHERE EXISTS ("
+               "SELECT 1 FROM markers m WHERE m.circuit IS NOT NULL AND m.circuit != '' AND UPPER(m.circuit) = UPPER(n.circuit)")
+        params = []
+        if source:
+            sql += " AND n.source = ?"
+            params.append(source)
+        sql += ") ORDER BY n.created_at DESC LIMIT ?"
+        params.append(limit)
     else:
-        rows = conn.execute(
-            "SELECT * FROM notifications ORDER BY created_at DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        sql = "SELECT * FROM notifications"
+        params = []
+        if source:
+            sql += " WHERE source = ?"
+            params.append(source)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+@app.get("/api/stats/overview")
+def stats_overview(range: str = "7d"):
+    """Resumen global + ranking de circuitos mas afectados (solo mensajes oficiales)."""
+    return statsmod.overview(range)
+
+
+@app.get("/api/stats")
+def stats_circuit(circuit: str, range: str = "7d"):
+    """Series diarias de un circuito (solo mensajes oficiales) para graficos."""
+    if not circuit:
+        raise HTTPException(status_code=400, detail="circuit requerido")
+    return statsmod.series_for_circuit(circuit, range)
 
 
 def _online_count() -> int:

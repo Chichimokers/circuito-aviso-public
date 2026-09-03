@@ -16,7 +16,7 @@ import { PROVINCIAS, CUBA_CENTER, getProvincia } from './provincias.js'
 import {
   Zap, Menu, X, Plus, Volume2, VolumeX, Music, KeyRound, MapPin, Maximize2, Building2,
   Search, History, Bell, Upload, Trash2, Play, Check, FileText, Map, Copy, RefreshCw, CheckCheck,
-  ChevronDown, Navigation, Users, User
+  ChevronDown, Navigation, Users, User, BarChart3, TrendingUp, Clock, ArrowLeft
 } from 'lucide-react'
 
 function circleIcon(color, unread, name) {
@@ -177,6 +177,633 @@ function AlertOverlay({ notices, onOpen, onFly }) {
   )
 }
 
+/* ===== Graficos SVG sin dependencias ===== */
+
+function BarChartSVG({ days }) {
+  const W = 320, H = 130, pad = 24, bottom = 16
+  const max = Math.max(1, ...days.map((d) => Math.max(d.caidas, d.restablecimientos)))
+  const vw = (W - pad * 2) / days.length
+  const bw = Math.min(10, vw * 0.32)
+  const labels = days.length > 10 ? Math.ceil(days.length / 10) : 1
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => (
+        <g key={g}>
+          <line x1={pad} x2={W - pad} y1={H - bottom - g * (H - bottom - 8)} y2={H - bottom - g * (H - bottom - 8)} stroke="rgba(255,255,255,.06)" strokeWidth="1" />
+          <text x={pad - 4} y={H - bottom - g * (H - bottom - 8) + 3} fontSize="8" fill="rgba(255,255,255,.3)" textAnchor="end">{Math.round(max * g)}</text>
+        </g>
+      ))}
+      {days.map((d, i) => {
+        const cx = pad + i * vw + vw / 2
+        const ch = (d.caidas / max) * (H - bottom - 8)
+        const rh = (d.restablecimientos / max) * (H - bottom - 8)
+        return (
+          <g key={d.date}>
+            {ch > 0 && <rect x={cx - bw - 1} y={H - bottom - ch} width={bw} height={ch} fill="#e74c3c" rx="2" opacity=".85"><title>{`${d.date} · Caídas: ${d.caidas}`}</title></rect>}
+            {rh > 0 && <rect x={cx} y={H - bottom - rh} width={bw} height={rh} fill="#2ecc71" rx="2" opacity=".85"><title>{`${d.date} · Restablecimientos: ${d.restablecimientos}`}</title></rect>}
+            {(i % labels === 0 || i === days.length - 1) && (
+              <text x={cx} y={H - 3} fontSize="8" fill="rgba(255,255,255,.45)" textAnchor="middle">{d.date.slice(5)}</text>
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function HourLineSVG({ days }) {
+  const W = 320, H = 130, pad = 28, bottom = 16
+  const maxH = 24
+  const plotW = W - pad * 2
+  const plotH = H - bottom - 8
+  const pts = days.map((d, i) => {
+    const x = pad + (i / Math.max(1, days.length - 1)) * plotW
+    const y = H - bottom - (Math.min(Math.max(d.horasCorriente, 0), maxH) / maxH) * plotH
+    return { x, y, ...d }
+  })
+  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const area = line + ` L${(pad + plotW).toFixed(1)},${H - bottom} L${pad},${H - bottom} Z`
+  const last = pts[pts.length - 1]
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 6, 12, 18, 24].map((h) => {
+        const y = H - bottom - (h / maxH) * plotH
+        return (
+          <g key={h}>
+            <line x1={pad} x2={W - pad} y1={y} y2={y} stroke="rgba(255,255,255,.06)" strokeWidth="1" />
+            <text x={pad - 4} y={y + 3} fontSize="8" fill="rgba(255,255,255,.35)" textAnchor="end">{h}h</text>
+          </g>
+        )
+      })}
+      <path d={area} fill="rgba(46,204,113,.12)" stroke="none" />
+      <path d={line} fill="none" stroke="#2ecc71" strokeWidth="2" strokeLinejoin="round" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill="#2ecc71" opacity=".7"><title>{`${p.date} · ${p.horasCorriente}h corriente`}</title></circle>
+      ))}
+      {last && <circle cx={last.x} cy={last.y} r="4" fill="#2ecc71" stroke="#0d1117" strokeWidth="1.5"><title>{`Último: ${last.date} · ${last.horasCorriente}h`}</title></circle>}
+    </svg>
+  )
+}
+
+function AvailabilityRing({ value, size = 64 }) {
+  const r = (size - 8) / 2
+  const circ = 2 * Math.PI * r
+  const offset = circ - (value / 100) * circ
+  const color = value >= 80 ? '#2ecc71' : value >= 50 ? '#f39c12' : '#e74c3c'
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="5" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="5"
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      <text x={size / 2} y={size / 2 + 1} fontSize="13" fontWeight="700" fill="#fff" textAnchor="middle" dominantBaseline="middle">{Math.round(value)}%</text>
+    </svg>
+  )
+}
+
+function DonutChart({ segments, size = 120, thickness = 14 }) {
+  const r = (size - thickness) / 2
+  const circ = 2 * Math.PI * r
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1
+  let acc = 0
+  return (
+    <div className="db-donut-wrap">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {segments.map((seg, i) => {
+          const pct = seg.value / total
+          const dash = pct * circ
+          const offset = circ - acc * circ - dash
+          acc += pct
+          return <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={seg.color}
+            strokeWidth={thickness} strokeDasharray={`${dash} ${circ - dash}`}
+            strokeDashoffset={offset} transform="rotate(-90 60 60)" opacity=".85">
+            <title>{`${seg.label}: ${seg.value} (${(pct*100).toFixed(1)}%)`}</title>
+          </circle>
+        })}
+        <text x={size/2} y={size/2 - 6} fontSize="18" fontWeight="800" fill="#fff" textAnchor="middle">{total}</text>
+        <text x={size/2} y={size/2 + 10} fontSize="9" fill="rgba(255,255,255,.5)" textAnchor="middle">eventos</text>
+      </svg>
+      <div className="db-donut-legend">
+        {segments.map((seg, i) => (
+          <div key={i} className="db-donut-item">
+            <span className="db-donut-dot" style={{ background: seg.color }}></span>
+            <span className="db-donut-label">{seg.label}</span>
+            <span className="db-donut-val">{seg.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function HorizontalBarChart({ items, maxVal, barHeight = 20 }) {
+  const mx = maxVal || Math.max(1, ...items.map((x) => x.value))
+  return (
+    <div className="db-hbar">
+      {items.map((item, i) => {
+        const pct = Math.max(2, (item.value / mx) * 100)
+        return (
+          <div key={i} className="db-hbar-row">
+            <span className="db-hbar-label" title={item.label}>{item.label}</span>
+            <div className="db-hbar-track">
+              <div className="db-hbar-fill" style={{ width: `${pct}%`, background: item.color || '#3498db', height: barHeight }}></div>
+            </div>
+            <span className="db-hbar-val">{item.display || item.value.toFixed(1)}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AreaChart({ days, dataKey, color = '#3498db', label = '' }) {
+  const W = 320, H = 130, pad = 28, bottom = 16
+  const vals = days.map((d) => d[dataKey] || 0)
+  const maxV = Math.max(1, ...vals)
+  const plotW = W - pad * 2
+  const plotH = H - bottom - 8
+  const pts = vals.map((v, i) => {
+    const x = pad + (i / Math.max(1, vals.length - 1)) * plotW
+    const y = H - bottom - (v / maxV) * plotH
+    return { x, y, v, date: days[i].date }
+  })
+  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const area = line + ` L${(pad + plotW).toFixed(1)},${H - bottom} L${pad},${H - bottom} Z`
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+  const avgY = H - bottom - (avg / maxV) * plotH
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => (
+        <g key={g}>
+          <line x1={pad} x2={W-pad} y1={H-bottom-g*plotH} y2={H-bottom-g*plotH} stroke="rgba(255,255,255,.06)" />
+          <text x={pad-4} y={H-bottom-g*plotH+3} fontSize="8" fill="rgba(255,255,255,.3)" textAnchor="end">{(maxV*g).toFixed(1)}</text>
+        </g>
+      ))}
+      {avg > 0 && <line x1={pad} x2={W-pad} y1={avgY} y2={avgY} stroke={color} strokeWidth="1" strokeDasharray="4 3" opacity=".4" />}
+      <path d={area} fill={color} opacity=".12" />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={color} opacity=".7"><title>{`${p.date}: ${p.v.toFixed(1)}${label}`}</title></circle>
+      ))}
+      {pts.length > 0 && <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y} r="4" fill={color} stroke="#0d1117" strokeWidth="1.5" />}
+    </svg>
+  )
+}
+
+function StackedBarChart({ days }) {
+  const W = 320, H = 130, pad = 24, bottom = 16
+  const max = Math.max(1, ...days.map((d) => (d.caidas || 0) + (d.restablecimientos || 0)))
+  const vw = (W - pad * 2) / days.length
+  const bw = Math.min(14, vw * 0.55)
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => (
+        <g key={g}>
+          <line x1={pad} x2={W-pad} y1={H-bottom-g*(H-bottom-8)} y2={H-bottom-g*(H-bottom-8)} stroke="rgba(255,255,255,.06)" />
+          <text x={pad-4} y={H-bottom-g*(H-bottom-8)+3} fontSize="8" fill="rgba(255,255,255,.3)" textAnchor="end">{Math.round(max*g)}</text>
+        </g>
+      ))}
+      {days.map((d, i) => {
+        const cx = pad + i * vw + vw / 2
+        const restH = ((d.restablecimientos || 0) / max) * (H - bottom - 8)
+        const causH = ((d.caidas || 0) / max) * (H - bottom - 8)
+        const totalH = restH + causH
+        return (
+          <g key={d.date}>
+            {restH > 0 && <rect x={cx - bw/2} y={H - bottom - totalH} width={bw} height={restH} fill="#2ecc71" rx="2" opacity=".8"><title>{`${d.date} · Restablecimientos: ${d.restablecimientos}`}</title></rect>}
+            {causH > 0 && <rect x={cx - bw/2} y={H - bottom - causH} width={bw} height={causH} fill="#e74c3c" rx="2" opacity=".8"><title>{`${d.date} · Cortes: ${d.caidas}`}</title></rect>}
+            {totalH === 0 && <rect x={cx - bw/2} y={H - bottom - 2} width={bw} height={2} fill="rgba(255,255,255,.1)" rx="1" />}
+            {days.length <= 14 && <text x={cx} y={H-3} fontSize="7" fill="rgba(255,255,255,.4)" textAnchor="middle">{d.date.slice(5)}</text>}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function DailyAvailChart({ days }) {
+  const W = 320, H = 110, pad = 28, bottom = 14
+  const barW = Math.min(20, (W - pad * 2) / days.length - 2)
+  const plotH = H - bottom - 4
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 6, 12, 18, 24].map((h) => {
+        const y = H - bottom - (h / 24) * plotH
+        return <g key={h}>
+          <line x1={pad} x2={W-pad} y1={y} y2={y} stroke="rgba(255,255,255,.06)" />
+          <text x={pad-4} y={y+3} fontSize="7" fill="rgba(255,255,255,.3)" textAnchor="end">{h}h</text>
+        </g>
+      })}
+      {days.map((d, i) => {
+        const cx = pad + (i / Math.max(1, days.length)) * (W - pad * 2) + ((W - pad * 2) / days.length) / 2
+        const goodH = ((24 - d.horasSinServicio) / 24) * plotH
+        const badH = (d.horasSinServicio / 24) * plotH
+        return (
+          <g key={d.date}>
+            <rect x={cx - barW/2} y={H - bottom - goodH - badH} width={barW} height={goodH} fill="#2ecc71" opacity=".7" rx="2">
+              <title>{`${d.date} · Luz: ${(24 - d.horasSinServicio).toFixed(1)}h`}</title>
+            </rect>
+            <rect x={cx - barW/2} y={H - bottom - badH} width={barW} height={badH} fill="#e74c3c" opacity=".7" rx="2">
+              <title>{`${d.date} · Sin luz: ${d.horasSinServicio.toFixed(1)}h`}</title>
+            </rect>
+            {days.length <= 10 && <text x={cx} y={H-2} fontSize="7" fill="rgba(255,255,255,.4)" textAnchor="middle">{d.date.slice(5)}</text>}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}
+
+function CumulativeChart({ days, dataKey = 'horasSinServicio', color = '#e74c3c', label = 'horas' }) {
+  const W = 320, H = 130, pad = 28, bottom = 16
+  let cum = 0
+  const vals = days.map((d) => { cum += (d[dataKey] || 0); return cum })
+  const maxV = Math.max(1, ...vals)
+  const plotW = W - pad * 2
+  const plotH = H - bottom - 8
+  const pts = vals.map((v, i) => ({
+    x: pad + (i / Math.max(1, vals.length - 1)) * plotW,
+    y: H - bottom - (v / maxV) * plotH,
+    v, date: days[i].date
+  }))
+  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const area = line + ` L${(pad + plotW).toFixed(1)},${H - bottom} L${pad},${H - bottom} Z`
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" className="stat-chart">
+      {[0, 0.25, 0.5, 0.75, 1].map((g) => (
+        <g key={g}>
+          <line x1={pad} x2={W-pad} y1={H-bottom-g*plotH} y2={H-bottom-g*plotH} stroke="rgba(255,255,255,.06)" />
+          <text x={pad-4} y={H-bottom-g*plotH+3} fontSize="8" fill="rgba(255,255,255,.3)" textAnchor="end">{(maxV*g).toFixed(0)}</text>
+        </g>
+      ))}
+      <path d={area} fill={color} opacity=".1" />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="2.5" fill={color} opacity=".7"><title>{`${p.date}: ${p.v.toFixed(1)} ${label} acum.`}</title></circle>
+      ))}
+      {pts.length > 0 && <circle cx={pts[pts.length-1].x} cy={pts[pts.length-1].y} r="4" fill={color} stroke="#0d1117" strokeWidth="1.5"><title>{`Total: ${pts[pts.length-1].v.toFixed(1)} ${label}`}</title></circle>}
+    </svg>
+  )
+}
+
+function StatsRangeBar({ range, onChangeRange }) {
+  const ranges = [
+    { k: '7d', label: '7 días' },
+    { k: '14d', label: '14 días' },
+    { k: '30d', label: '30 días' },
+  ]
+  return (
+    <div className="db-range">
+      {ranges.map((r) => (
+        <button key={r.k} className={`db-range-btn ${range === r.k ? 'active' : ''}`} onClick={() => onChangeRange(r.k)}>
+          {r.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function StatsRanking({ data, loading, range, onChangeRange, onOpen }) {
+  const total = data && data.totals ? data.totals : null
+  const circuits = (data && data.circuits) || []
+  const totalHorasPeriodo = range === '7d' ? 168 : range === '14d' ? 336 : 720
+  const disponibilidad = total ? Math.max(0, ((totalHorasPeriodo * Math.max(total.circuitos, 1)) - total.horasSinServicio) / (totalHorasPeriodo * Math.max(total.circuitos, 1)) * 100) : 0
+  const tasaResolucion = total && total.caidas > 0 ? (total.restablecimientos / total.caidas * 100) : 0
+  const top8 = circuits.slice(0, 8)
+
+  return (
+    <div className="db-dash">
+      <div className="db-kpi-grid">
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-caidas"><Zap size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{total ? total.caidas : '–'}</span>
+            <span className="db-kpi-label">Cortes de servicio</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-rest"><TrendingUp size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{total ? total.restablecimientos : '–'}</span>
+            <span className="db-kpi-label">Servicios restablecidos</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-hours"><Clock size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{total ? `${(total.horasSinServicio).toFixed(1)}h` : '–'}</span>
+            <span className="db-kpi-label">Tiempo total sin servicio</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-res"><BarChart3 size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{tasaResolucion.toFixed(0)}%</span>
+            <span className="db-kpi-label">Tasa de resolución</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="db-kpi-row-secondary">
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{total ? total.circuitos : '–'}</span>
+          <span className="db-kpi-sm-label">Circuitos con datos</span>
+        </div>
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{total && total.caidas > 0 ? (total.horasSinServicio / total.caidas).toFixed(1) + 'h' : '–'}</span>
+          <span className="db-kpi-sm-label">Duración media por corte</span>
+        </div>
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{total ? total.info : '–'}</span>
+          <span className="db-kpi-sm-label">Avisos informativos</span>
+        </div>
+      </div>
+
+      {!loading && total && (
+        <div className="db-charts-row">
+          <div className="db-block db-chart-half">
+            <div className="db-block-head">
+              <div className="db-block-title">Distribución de eventos</div>
+            </div>
+            <DonutChart segments={[
+              { label: 'Cortes', value: total.caidas, color: '#e74c3c' },
+              { label: 'Restablecimientos', value: total.restablecimientos, color: '#2ecc71' },
+              { label: 'Informativos', value: total.info, color: '#3498db' },
+            ]} />
+          </div>
+          <div className="db-block db-chart-half">
+            <div className="db-block-head">
+              <div className="db-block-title"><BarChart3 size={14} /> Top circuitos · horas sin luz</div>
+            </div>
+            <HorizontalBarChart
+              items={top8.map((c) => ({ label: c.circuit, value: c.horasSinServicio, display: c.horasSinServicio.toFixed(1) + 'h', color: c.horasSinServicio > 20 ? '#e74c3c' : c.horasSinServicio > 10 ? '#f39c12' : '#3498db' }))}
+            />
+          </div>
+        </div>
+      )}
+
+      {!loading && total && (
+        <div className="db-charts-row">
+          <div className="db-block db-chart-half">
+            <div className="db-block-head">
+              <div className="db-block-title"><Zap size={14} /> Top circuitos · cortes</div>
+            </div>
+            <HorizontalBarChart
+              items={top8.filter((c) => c.caidas > 0).slice(0, 6).map((c) => ({ label: c.circuit, value: c.caidas, display: String(c.caidas), color: '#e74c3c' }))}
+            />
+          </div>
+          <div className="db-block db-chart-half">
+            <div className="db-block-head">
+              <div className="db-block-title"><Clock size={14} /> Top circuitos · duración media</div>
+            </div>
+            <HorizontalBarChart
+              items={top8.filter((c) => c.duracionMediaCorte > 0).slice(0, 6).map((c) => ({ label: c.circuit, value: c.duracionMediaCorte, display: c.duracionMediaCorte.toFixed(1) + 'h', color: '#f39c12' }))}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="db-block">
+        <div className="db-block-head">
+          <div className="db-block-title"><BarChart3 size={15} /> Ranking completo</div>
+          <span className="db-block-hint">Toca un circuito para ver el detalle</span>
+        </div>
+        <div className="db-ranking">
+          {loading && !data && <Spinner label="Cargando datos…" />}
+          {!loading && circuits.length === 0 && (
+            <div className="empty">Sin datos oficiales en este período.</div>
+          )}
+          {!loading && circuits.length > 0 && (
+            <>
+              <div className="db-rank-head">
+                <span className="db-rank-pos">#</span>
+                <span className="db-rank-name">Circuito</span>
+                <span className="db-rank-metric">Horas sin luz</span>
+                <span className="db-rank-metric">Cortes</span>
+                <span className="db-rank-metric">Dur. media</span>
+                <span className="db-rank-metric">Caídas</span>
+                <span className="db-rank-metric">Restab.</span>
+              </div>
+              {circuits.map((c, idx) => {
+                const max = circuits[0].horasSinServicio || 1
+                const pct = Math.max(3, Math.round((c.horasSinServicio / max) * 100))
+                return (
+                  <button key={c.circuit} className="db-rank-row" onClick={() => onOpen(c.circuit)}>
+                    <span className="db-rank-pos">{idx + 1}</span>
+                    <span className="db-rank-name">{c.circuit}</span>
+                    <span className="db-rank-metric">
+                      <span className="db-rank-bar-wrap">
+                        <span className="db-rank-bar" style={{ width: `${pct}%` }}></span>
+                      </span>
+                      <span className="db-rank-val">{c.horasSinServicio.toFixed(1)}h</span>
+                    </span>
+                    <span className="db-rank-metric db-rank-val">{c.cortes}</span>
+                    <span className="db-rank-metric db-rank-val">{c.duracionMediaCorte.toFixed(1)}h</span>
+                    <span className="db-rank-metric db-rank-val db-val-red">{c.caidas}</span>
+                    <span className="db-rank-metric db-rank-val db-val-green">{c.restablecimientos}</span>
+                  </button>
+                )
+              })}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StatsDetail({ circuit, data, loading, range, onChangeRange, onBack }) {
+  const d = data && data.days ? data.days : []
+  const t = data && data.totals ? data.totals : null
+  const totalHorasPeriodo = range === '7d' ? 168 : range === '14d' ? 336 : 720
+  const disponibilidad = t ? Math.max(0, ((totalHorasPeriodo - t.horasSinServicio) / totalHorasPeriodo * 100)) : 0
+  const tasaResolucion = t && t.caidas > 0 ? (t.restablecimientos / t.caidas * 100) : 0
+  const diasConCorte = d.filter((x) => x.caidas > 0).length
+
+  return (
+    <div className="db-dash">
+      <div className="db-detail-top">
+        <button className="db-back-btn" title="Volver al ranking" onClick={onBack}><ArrowLeft size={16} /></button>
+        <div className="db-detail-info">
+          <div className="db-detail-circuit">{circuit}</div>
+          <div className="db-detail-sub">Detalle de servicio · datos oficiales</div>
+        </div>
+        <AvailabilityRing value={disponibilidad} />
+      </div>
+
+      <div className="db-kpi-grid db-kpi-grid-detail">
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-caidas"><Zap size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{t ? t.caidas : '–'}</span>
+            <span className="db-kpi-label">Cortes totales</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-rest"><TrendingUp size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{t ? t.restablecimientos : '–'}</span>
+            <span className="db-kpi-label">Restablecimientos</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-hours"><Clock size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{t ? `${t.horasSinServicio.toFixed(1)}h` : '–'}</span>
+            <span className="db-kpi-label">Sin servicio</span>
+          </div>
+        </div>
+        <div className="db-kpi">
+          <div className="db-kpi-icon db-kpi-res"><BarChart3 size={18} /></div>
+          <div className="db-kpi-data">
+            <span className="db-kpi-num">{t ? `${t.duracionMediaCorte.toFixed(1)}h` : '–'}</span>
+            <span className="db-kpi-label">Duración media corte</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="db-kpi-row-secondary">
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{diasConCorte}</span>
+          <span className="db-kpi-sm-label">Días con corte</span>
+        </div>
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{t ? `${t.duracionMaxCorte.toFixed(1)}h` : '–'}</span>
+          <span className="db-kpi-sm-label">Corte más largo</span>
+        </div>
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{d.length}</span>
+          <span className="db-kpi-sm-label">Días con datos</span>
+        </div>
+        <div className="db-kpi-sm">
+          <span className="db-kpi-sm-num">{tasaResolucion.toFixed(0)}%</span>
+          <span className="db-kpi-sm-label">Tasa resolución</span>
+        </div>
+      </div>
+
+      {loading && !data && <Spinner label="Cargando…" />}
+      {!loading && d.length === 0 && (
+        <div className="empty">Sin datos oficiales para {circuit} en este período.</div>
+      )}
+      {!loading && d.length > 0 && (
+        <>
+          <div className="db-charts-row">
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title"><BarChart3 size={14} /> Eventos por día</div>
+                <span className="db-block-hint">Cortes vs restablecimientos</span>
+              </div>
+              <StackedBarChart days={d} />
+              <div className="stat-legend">
+                <span><i className="lg-dot" style={{ background: '#e74c3c' }}></i>Cortes</span>
+                <span><i className="lg-dot" style={{ background: '#2ecc71' }}></i>Restablecimientos</span>
+              </div>
+            </div>
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title"><Zap size={14} /> Disponibilidad 24h</div>
+                <span className="db-block-hint">Corriente vs sin luz por día</span>
+              </div>
+              <DailyAvailChart days={d} />
+              <div className="stat-legend">
+                <span><i className="lg-dot" style={{ background: '#2ecc71' }}></i>Con luz</span>
+                <span><i className="lg-dot" style={{ background: '#e74c3c' }}></i>Sin luz</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="db-charts-row">
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title"><TrendingUp size={14} /> Horas sin servicio acumuladas</div>
+              </div>
+              <CumulativeChart days={d} dataKey="horasSinServicio" color="#e74c3c" label="horas" />
+            </div>
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title"><Clock size={14} /> Horas con corriente acumuladas</div>
+              </div>
+              <CumulativeChart days={d} dataKey="horasCorriente" color="#2ecc71" label="horas" />
+            </div>
+          </div>
+
+          <div className="db-charts-row">
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title">Distribución del período</div>
+              </div>
+              <DonutChart segments={[
+                { label: 'Horas sin luz', value: t ? Math.round(t.horasSinServicio) : 0, color: '#e74c3c' },
+                { label: 'Horas con luz', value: t ? Math.round(totalHorasPeriodo - t.horasSinServicio) : totalHorasPeriodo, color: '#2ecc71' },
+              ]} />
+            </div>
+            <div className="db-block db-chart-half">
+              <div className="db-block-head">
+                <div className="db-block-title">Resumen de eventos</div>
+              </div>
+              <DonutChart segments={[
+                { label: 'Cortes', value: t ? t.caidas : 0, color: '#e74c3c' },
+                { label: 'Restablecimientos', value: t ? t.restablecimientos : 0, color: '#2ecc71' },
+              ]} />
+            </div>
+          </div>
+
+          <div className="db-charts-row">
+            <div className="db-block db-chart-full">
+              <div className="db-block-head">
+                <div className="db-block-title"><TrendingUp size={14} /> Disponibilidad diaria (%)</div>
+              </div>
+              <HourLineSVG days={d} />
+              <div className="stat-legend">
+                <span><i className="lg-dot" style={{ background: '#2ecc71' }}></i>Horas de corriente</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="db-block db-block-table">
+            <div className="db-block-head">
+              <div className="db-block-title"><Clock size={15} /> Desglose diario</div>
+            </div>
+            <div className="db-table-wrap">
+              <table className="db-table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Cortes</th>
+                    <th>Restab.</th>
+                    <th>Sin luz</th>
+                    <th>Con luz</th>
+                    <th>Dispon.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {d.map((day) => {
+                    const disp = ((24 - day.horasSinServicio) / 24 * 100)
+                    return (
+                      <tr key={day.date} className={day.caidas > 0 ? 'db-row-alert' : ''}>
+                        <td className="db-td-date">{day.date}</td>
+                        <td className="db-val-red">{day.caidas}</td>
+                        <td className="db-val-green">{day.restablecimientos}</td>
+                        <td>{day.horasSinServicio.toFixed(1)}h</td>
+                        <td>{day.horasCorriente.toFixed(1)}h</td>
+                        <td>
+                          <span className={`db-disp ${disp >= 80 ? 'db-disp-ok' : disp >= 50 ? 'db-disp-warn' : 'db-disp-bad'}`}>
+                            {disp.toFixed(0)}%
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
   const [markers, setMarkers] = useState([])
   const [oficialState, setOficialState] = useState({})
@@ -188,11 +815,19 @@ export default function App() {
   const [notifCircuit, setNotifCircuit] = useState(null)
   const [historial, setHistorial] = useState([])
   const [historialOpen, setHistorialOpen] = useState(false)
+  const [histFilter, setHistFilter] = useState('oficial')
   const [munList, setMunList] = useState([])
   const [munOpen, setMunOpen] = useState(false)
   const [munLoading, setMunLoading] = useState(false)
   const [muniToasts, setMuniToasts] = useState([])
   const [drawerTab, setDrawerTab] = useState('puntos')
+  const [statsOpen, setStatsOpen] = useState(false)
+  const [statsOverview, setStatsOverview] = useState(null)
+  const [statsRange, setStatsRange] = useState('30d')
+  const [statsLoading, setStatsLoading] = useState(false)
+  const [statsCircuit, setStatsCircuit] = useState(null)
+  const [statsDetail, setStatsDetail] = useState(null)
+  const [statsDetailLoading, setStatsDetailLoading] = useState(false)
   const [markersLoading, setMarkersLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -340,10 +975,11 @@ export default function App() {
 
   useEffect(() => { reloadOficial() }, [reloadOficial])
 
-  const loadHistorial = useCallback(async (circuit) => {
+  const loadHistorial = useCallback(async (circuit, filter) => {
     setHistoryLoading(true)
     try {
-      const list = await apiNotifications(circuit, 50)
+      const src = filter === 'oficial' ? 'oficial' : undefined
+      const list = await apiNotifications(circuit, 200, null, src)
       setHistorial(list)
     } catch (e) {
       setHistorial([])
@@ -362,6 +998,59 @@ export default function App() {
     setMunLoading(false)
   }, [])
 
+  const loadStatsOverview = useCallback(async (range) => {
+    setStatsLoading(true)
+    try {
+      const data = await apiGet(`/stats/overview?range=${range || statsRange}`)
+      setStatsOverview(data)
+    } catch (e) {
+      setStatsOverview(null)
+    }
+    setStatsLoading(false)
+  }, [statsRange])
+
+  const loadStatsDetail = useCallback(async (circuit, range) => {
+    setStatsDetailLoading(true)
+    try {
+      const data = await apiGet(`/stats?circuit=${encodeURIComponent(circuit)}&range=${range || statsRange}`)
+      setStatsDetail(data)
+    } catch (e) {
+      setStatsDetail(null)
+    }
+    setStatsDetailLoading(false)
+  }, [statsRange])
+
+  // Dashboard de estadísticas: abre el modal y carga el overview
+  const openStatsDashboard = useCallback(() => {
+    setStatsOpen(true)
+    setStatsCircuit(null)
+    setStatsDetail(null)
+    loadStatsOverview(statsRange)
+  }, [loadStatsOverview, statsRange])
+
+  const closeStatsDashboard = useCallback(() => {
+    setStatsOpen(false)
+    setStatsCircuit(null)
+    setStatsDetail(null)
+  }, [])
+
+  const openStatsCircuit = useCallback((circuit) => {
+    setStatsCircuit(circuit)
+    setStatsDetail(null)
+    loadStatsDetail(circuit, statsRange)
+  }, [loadStatsDetail, statsRange])
+
+  const changeStatsRange = useCallback((range) => {
+    setStatsRange(range)
+    setStatsOverview(null)
+    setStatsDetail(null)
+    loadStatsOverview(range)
+    setStatsCircuit((cur) => {
+      if (cur) loadStatsDetail(cur, range)
+      return cur
+    })
+  }, [loadStatsOverview, loadStatsDetail])
+
   // Panel de municipios: carga inicial al montar y refresco periódico mientras esté abierto
   useEffect(() => {
     loadMunicipios()
@@ -377,8 +1066,13 @@ export default function App() {
     setNotifCircuit(circuit)
     setHistorialOpen(true)
     clearUnread(circuit)
-    loadHistorial(circuit)
-  }, [loadHistorial])
+    loadHistorial(circuit, histFilter)
+  }, [loadHistorial, histFilter])
+
+  const changeHistFilter = useCallback((f) => {
+    setHistFilter(f)
+    if (notifCircuit) loadHistorial(notifCircuit, f)
+  }, [notifCircuit, loadHistorial])
 
   const openDetail = useCallback((alert) => {
     setDetailAlert(alert)
@@ -429,7 +1123,7 @@ export default function App() {
       setTimeout(() => {
         setNotices((prev) => { const n = { ...prev }; delete n[nkey]; return n })
       }, 9000)
-      if (notifRef.current === ev.code) loadHistorial(ev.code)
+      if (notifRef.current === ev.code) loadHistorial(ev.code, histFilter)
       // Aviso de municipio (sin punto): refrescar el panel y mostrar toast flotante
       if (!points.length && ev.lat == null) {
         const mkey = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
@@ -724,6 +1418,7 @@ export default function App() {
           >
             {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
+          <button className="admin-toggle" title="Estadísticas oficiales" onClick={openStatsDashboard}><BarChart3 size={18} /></button>
           <button className="admin-toggle" title="Configurar sonidos por circuito" onClick={() => setSoundOpen((v) => !v)}><Music size={18} /></button>
           <button
             className="admin-toggle"
@@ -812,7 +1507,7 @@ export default function App() {
                     )}
                   </div>
                   {m.circuit && (
-                    <button className="link-btn" onClick={() => openHistorial(m.circuit)}><History size={14} /> Historial de alertas</button>
+                    <button className="link-btn" onClick={() => openHistorial(m.circuit)}><History size={14} /> Hist. oficial del circuito</button>
                   )}
                   {m.circuit && (
                     <button className="link-btn" onClick={() => openLastAlert(m.circuit)}><Bell size={14} /> Última alerta</button>
@@ -1092,18 +1787,35 @@ export default function App() {
       {historialOpen && notifCircuit && (
         <div className="hist-card">
           <button className="close" onClick={() => setHistorialOpen(false)}>×</button>
-          <h3><History size={16} /> Historial · {notifCircuit}</h3>
+          <h3><History size={16} /> Historial · {notifCircuit} {historial.length > 0 && <span className="count">{historial.length}</span>}</h3>
+          <div className="hist-filter">
+            <button className={`hist-filter-btn ${histFilter === 'oficial' ? 'active' : ''}`} onClick={() => changeHistFilter('oficial')}>
+              <span className="hist-filter-dot hist-filter-dot-oficial"></span> Oficial
+            </button>
+            <button className={`hist-filter-btn ${histFilter === 'all' ? 'active' : ''}`} onClick={() => changeHistFilter('all')}>
+              <span className="hist-filter-dot hist-filter-dot-all"></span> Todos
+            </button>
+          </div>
           {historyLoading ? (
             <Spinner label="Cargando historial…" />
           ) : historial.length === 0 ? (
-            <p className="hist-empty">Sin alertas registradas todavía.</p>
+            <p className="hist-empty">{histFilter === 'oficial' ? 'Sin alertas oficiales registradas.' : 'Sin alertas registradas para este circuito.'}</p>
           ) : (
             <ul className="hist-list">
               {historial.map((h) => {
+                const isRest = h.status === 'RESTABLECIDO'
+                const isAfect = h.status === 'AFECTADO'
+                const isOficial = h.source === 'oficial'
                 return (
-                  <li key={h.id} className="hist-item">
+                  <li key={h.id} className={`hist-item ${isRest ? 'hist-rest' : isAfect ? 'hist-afect' : 'hist-info'}`}>
                     <StatusDot status={h.status} />
                     <div className="hist-body">
+                      <div className="hist-status-line">
+                        <span className={`hist-status-tag ${isRest ? 'tag-rest' : isAfect ? 'tag-afect' : 'tag-info'}`}>
+                          {isRest ? 'RESTABLECIDO' : isAfect ? 'AFECTADO' : 'INFO'}
+                        </span>
+                        {isOficial && <span className="oficial-badge">Canal oficial</span>}
+                      </div>
                       <div className="hist-text">
                         {splitLinks(h.text || h.circuit).map((seg, i) =>
                           seg.url ? (
@@ -1113,7 +1825,6 @@ export default function App() {
                           )
                         )}
                       </div>
-                      {h.source === 'oficial' && <span className="oficial-badge">Canal oficial</span>}
                       <div className="hist-time">{new Date(h.created_at).toLocaleString()}</div>
                     </div>
                   </li>
@@ -1121,6 +1832,48 @@ export default function App() {
               })}
             </ul>
           )}
+        </div>
+      )}
+
+      {/* Dashboard de estadísticas oficiales a pantalla completa */}
+      {statsOpen && (
+        <div className="stats-dashboard">
+          <div className="db-head">
+            <div className="db-head-title">
+              <BarChart3 size={20} />
+              <div>
+                <h2>Estadísticas oficiales</h2>
+                <span className="db-head-sub">Exclusivo del canal oficial · se acumula con el tiempo</span>
+              </div>
+            </div>
+            <div className="db-head-actions">
+              {statsCircuit && (
+                <button className="db-btn" onClick={closeStatsDashboard}><ArrowLeft size={16} /> Ver todos</button>
+              )}
+              <StatsRangeBar range={statsRange} onChangeRange={changeStatsRange} />
+              <button className="close" onClick={closeStatsDashboard}>×</button>
+            </div>
+          </div>
+          <div className="db-body">
+            {statsCircuit ? (
+              <StatsDetail
+                circuit={statsCircuit}
+                data={statsDetail}
+                loading={statsDetailLoading}
+                range={statsRange}
+                onBack={() => setStatsCircuit(null)}
+                onChangeRange={changeStatsRange}
+              />
+            ) : (
+              <StatsRanking
+                data={statsOverview}
+                loading={statsLoading}
+                range={statsRange}
+                onChangeRange={changeStatsRange}
+                onOpen={openStatsCircuit}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -1339,8 +2092,8 @@ export default function App() {
                             {m.circuit && (
                               <button
                                 className="row-hist"
-                                title="Historial de alertas"
-                                aria-label="Ver historial de alertas"
+                                title="Hist. oficial"
+                                aria-label="Ver historial oficial"
                                 onClick={(e) => { e.stopPropagation(); openHistorial(m.circuit) }}
                               ><History size={14} /></button>
                             )}

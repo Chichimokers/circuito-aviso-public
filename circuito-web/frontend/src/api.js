@@ -45,10 +45,11 @@ export async function apiVote(markerId) {
   return data
 }
 
-export async function apiNotifications(circuit, limit = 50, kind) {
+export async function apiNotifications(circuit, limit = 50, kind, source) {
   let p = `limit=${limit}`
   if (circuit) p += `&circuit=${encodeURIComponent(circuit)}`
   if (kind) p += `&kind=${encodeURIComponent(kind)}`
+  if (source) p += `&source=${encodeURIComponent(source)}`
   const data = await apiGet(`/notifications?${p}`)
   return data
 }
