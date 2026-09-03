@@ -261,7 +261,7 @@ function AvailabilityRing({ value, size = 64 }) {
   )
 }
 
-function DonutChart({ segments, size = 120, thickness = 14 }) {
+function DonutChart({ segments, size = 120, thickness = 14, suffix = 'eventos' }) {
   const r = (size - thickness) / 2
   const circ = 2 * Math.PI * r
   const total = segments.reduce((s, x) => s + x.value, 0) || 1
@@ -281,7 +281,7 @@ function DonutChart({ segments, size = 120, thickness = 14 }) {
           </circle>
         })}
         <text x={size/2} y={size/2 - 6} fontSize="18" fontWeight="800" fill="#fff" textAnchor="middle">{total}</text>
-        <text x={size/2} y={size/2 + 10} fontSize="9" fill="rgba(255,255,255,.5)" textAnchor="middle">eventos</text>
+        <text x={size/2} y={size/2 + 10} fontSize="9" fill="rgba(255,255,255,.5)" textAnchor="middle">{suffix}</text>
       </svg>
       <div className="db-donut-legend">
         {segments.map((seg, i) => (
@@ -466,7 +466,7 @@ function StatsRangeBar({ range, onChangeRange }) {
 function StatsRanking({ data, loading, range, onChangeRange, onOpen }) {
   const total = data && data.totals ? data.totals : null
   const circuits = (data && data.circuits) || []
-  const totalHorasPeriodo = range === '7d' ? 168 : range === '14d' ? 336 : 720
+  const totalHorasPeriodo = range === '7d' ? 84 : range === '14d' ? 168 : 360
   const disponibilidad = total ? Math.max(0, ((totalHorasPeriodo * Math.max(total.circuitos, 1)) - total.horasSinServicio) / (totalHorasPeriodo * Math.max(total.circuitos, 1)) * 100) : 0
   const tasaResolucion = total && total.caidas > 0 ? (total.restablecimientos / total.caidas * 100) : 0
   const top8 = circuits.slice(0, 8)
@@ -615,7 +615,7 @@ function StatsRanking({ data, loading, range, onChangeRange, onOpen }) {
 function StatsDetail({ circuit, data, loading, range, onChangeRange, onBack }) {
   const d = data && data.days ? data.days : []
   const t = data && data.totals ? data.totals : null
-  const totalHorasPeriodo = range === '7d' ? 168 : range === '14d' ? 336 : 720
+  const totalHorasPeriodo = range === '7d' ? 84 : range === '14d' ? 168 : 360
   const disponibilidad = t ? Math.max(0, ((totalHorasPeriodo - t.horasSinServicio) / totalHorasPeriodo * 100)) : 0
   const tasaResolucion = t && t.caidas > 0 ? (t.restablecimientos / t.caidas * 100) : 0
   const diasConCorte = d.filter((x) => x.caidas > 0).length
@@ -732,7 +732,7 @@ function StatsDetail({ circuit, data, loading, range, onChangeRange, onBack }) {
               <div className="db-block-head">
                 <div className="db-block-title">Distribución del período</div>
               </div>
-              <DonutChart segments={[
+              <DonutChart suffix="horas" segments={[
                 { label: 'Horas sin luz', value: t ? Math.round(t.horasSinServicio) : 0, color: '#e74c3c' },
                 { label: 'Horas con luz', value: t ? Math.round(totalHorasPeriodo - t.horasSinServicio) : totalHorasPeriodo, color: '#2ecc71' },
               ]} />

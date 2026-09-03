@@ -5,9 +5,10 @@ Metodologia de horas sin servicio:
 - Se recorren los eventos oficiales de un circuito ordenados por created_at.
 - Un estado AFECTADO abre un "corte abierto"; un RESTABLECIDO posterior lo cierra.
 - La duracion del corte (en horas) se asigna al/os dia/s natural/es que atraviesa.
-- horasCorriente_dia = 24 - horasCorte_dia.
+- horasCorriente_dia = MONITORING_HOURS - horasCorte_dia.
 - Un corte que sigue abierto cuenta hasta "ahora".
 Los estados INFO se ignoran (no abren ni cierran cortes).
+MONITORING_HOURS = 12 (7am-7pm, horario de monitoreo del bot).
 """
 
 import logging
@@ -18,6 +19,7 @@ from . import db
 log = logging.getLogger(__name__)
 
 SOURCE_OFFICIAL = "oficial"
+MONITORING_HOURS = 12.0  # 7am a 7pm
 
 
 def _parse_ts(value: str):
@@ -145,7 +147,7 @@ def series_for_circuit(circuit, range_key):
         corte = round(hours.get(k, 0.0), 2)
         dias = _cur_key_has_data(by_day, hours, k)
         entries = by_day.get(k, {})
-        hours_day = 24.0 - corte
+        hours_day = MONITORING_HOURS - corte
         days_out.append({
             "date": k,
             "caidas": entries.get("caidas", 0),
