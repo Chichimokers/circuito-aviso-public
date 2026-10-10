@@ -1,6 +1,6 @@
 # Circuito Aviso
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Node](https://img.shields.io/badge/Node-18%2B-green.svg)](https://nodejs.org/)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
@@ -461,7 +461,25 @@ ADMIN_KEY=tu_clave python scripts/tests/test_admin.py
 
 ## Licencia
 
-Distribuido bajo la licencia **MIT**. Ver [`LICENSE`](LICENSE).
+Distribuido bajo la **GNU General Public License v3.0** (GPL-3.0). Ver [`LICENSE`](LICENSE).
+
+```
+Circuito Aviso
+Copyright (C) 2026  Chichimokers
+
+Este programa es software libre: puedes redistribuirlo y/o modificarlo
+bajo los términos de la GNU General Public License tal como la publica
+la Free Software Foundation, ya sea la versión 3 de la Licencia, o
+(a tu elección) cualquier versión posterior.
+
+Este programa se distribuye con la esperanza de que sea útil,
+pero SIN NINGUNA GARANTÍA; ni siquiera la garantía implícita de
+COMERCIABILIDAD o IDONEIDAD PARA UN PROPÓSITO PARTICULAR. Ver la
+GNU General Public License para más detalles.
+
+Deberías haber recibido una copia de la GNU General Public License
+junto con este programa. Si no, consulta <https://www.gnu.org/licenses/>.
+```
 
 ---
 
