@@ -1,6 +1,4 @@
 # Environment / credentials
-.env
-.env.*
 !.env.example
 !*.env.example
 *.session
@@ -36,4 +34,4 @@ circuito-web/static/
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
+config.bat
