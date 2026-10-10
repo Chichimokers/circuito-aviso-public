@@ -1,12 +1,25 @@
 # Environment / credentials
 .env
 .env.*
+!.env.example
+!*.env.example
 *.session
+*.session-journal
+
+# Database / runtime data
+circuito.db
+circuito.db-*
+*.db
+*.db-*
+stats.json
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
+venv/
+.venv/
+*.egg-info/
 
 # Node / frontend build
 node_modules/
@@ -17,6 +30,7 @@ circuito-web/static/
 *.tar.gz
 *.tgz
 *.log
+*.bundle
 
 # OS / editor
 .DS_Store

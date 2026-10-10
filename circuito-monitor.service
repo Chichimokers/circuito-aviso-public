@@ -1,0 +1,18 @@
+[Unit]
+Description=Circuito Aviso - Monitor de Telegram
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/circuito-monitor
+EnvironmentFile=/opt/circuito-monitor/.env
+ExecStart=/opt/circuito-monitor/venv/bin/python monitor_bot.py
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/circuito-monitor.log
+StandardError=append:/var/log/circuito-monitor.log
+
+[Install]
+WantedBy=multi-user.target
