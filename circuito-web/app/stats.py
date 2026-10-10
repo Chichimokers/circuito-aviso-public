@@ -90,20 +90,29 @@ def compute_periods(official_events):
 
 
 def _split_hours_by_day(start, end, now):
-    """Reparte horas entre [start, end] por dia natural (end=None = abierto hasta now)."""
+    """Reparte horas entre [start, end] por dia natural, recortado a la ventana de monitoreo (7am-7pm).
+
+    end=None = abierto hasta now. Solo cuenta horas dentro de 07:00-19:00 UTC.
+    """
     end = end if end is not None else now
     if end <= start:
         return {}
     days = {}
     cur = start
+    MONITOR_START = 7  # 7am UTC
+    MONITOR_END = 19   # 7pm UTC
     while cur < end:
-        day_end = cur.replace(hour=0, minute=0, second=0, microsecond=0) + __import__("datetime").timedelta(days=1)
-        seg_end = min(day_end, end)
-        if seg_end > cur:
-            h = (seg_end - cur).total_seconds() / 3600.0
+        day_start = cur.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_monitor_start = day_start.replace(hour=MONITOR_START)
+        day_monitor_end = day_start.replace(hour=MONITOR_END)
+        seg_start = max(cur, day_monitor_start)
+        seg_end = min(day_monitor_end, end)
+        if seg_end > seg_start:
+            h = (seg_end - seg_start).total_seconds() / 3600.0
             k = _day_key(cur)
             days[k] = days.get(k, 0.0) + h
-        cur = seg_end
+        # avanzar al inicio del dia siguiente
+        cur = min(day_start + __import__("datetime").timedelta(days=1), end) if end > day_monitor_end else end
     return days
 
 
